@@ -1,0 +1,22 @@
+{
+  "name": "fumettoquota",
+  "version": "1.0.0",
+  "description": "Il primo strumento italiano per scoprire il valore della tua collezione di fumetti",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "express-session": "^1.17.3",
+    "bcryptjs": "^2.4.3",
+    "uuid": "^9.0.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "keywords": ["fumetti", "comics", "manga", "collezione", "valutazione"],
+  "author": "FumettoQuota",
+  "license": "ISC"
+}

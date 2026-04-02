@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <meta name="theme-color" content="#0a0a0a">
+  <meta name="description" content="FumettoQuota - Scopri il valore della tua collezione di fumetti italiani, manga e comics">
+  <meta property="og:title" content="FumettoQuota - Quanto vale la tua collezione?">
+  <meta property="og:description" content="Scopri il valore reale dei tuoi fumetti in pochi secondi. Gratis, in italiano.">
+  <meta property="og:image" content="/icon-512.png">
+  <title>FumettoQuota — Quanto vale la tua collezione?</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icon-192.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0a;
+      --surface: #141414;
+      --surface2: #1e1e1e;
+      --surface3: #282828;
+      --gold: #f5c518;
+      --gold-dark: #c9a200;
+      --gold-light: #ffe066;
+      --text: #f0f0f0;
+      --text-muted: #888;
+      --text-dim: #555;
+      --border: #2a2a2a;
+      --success: #22c55e;
+      --error: #ef4444;
+      --radius: 12px;
+      --radius-sm: 8px;
+    }
+
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── NAVBAR ── */
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(10,10,10,0.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 20px;
+      height: 60px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .nav-logo {
+      font-family: 'Bangers', cursive;
+      font-size: 26px;
+      letter-spacing: 1px;
+      color: var(--gold);
+      text-decoration: none;
+      cursor: pointer;
+    }
+    .nav-logo span { color: var(--text); }
+    .nav-actions { display: flex; gap: 10px; align-items: center; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 18px; border-radius: var(--radius-sm); font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; border: none; text-decoration: none; }
+    .btn-gold { background: var(--gold); color: #000; }
+    .btn-gold:hover { background: var(--gold-light); transform: translateY(-1px); }
+    .btn-outline { background: transparent; color: var(--text); border: 1px solid var(--border); }
+    .btn-outline:hover { border-color: var(--gold); color: var(--gold); }
+    .btn-ghost { background: transparent; color: var(--text-muted); }
+    .btn-ghost:hover { color: var(--text); }
+    .btn-danger { background: var(--error); color: #fff; }
+    .btn-danger:hover { opacity: 0.85; }
+    .btn-sm { padding: 6px 12px; font-size: 13px; }
+    .btn-lg { padding: 14px 28px; font-size: 16px; }
+    #nav-user { font-size: 13px; color: var(--text-muted); }
+    #nav-user strong { color: var(--gold); }
+
+    /* ── PAGES ── */
+    .page { display: none; }
+    .page.active { display: block; }
+
+    /* ── HOME ── */
+    .hero {
+      text-align: center;
+      padding: 80px 20px 60px;
+      max-width: 700px;
+      margin: 0 auto;
+    }
+    .hero-badge {
+      display: inline-block;
+      background: rgba(245,197,24,0.12);
+      border: 1px solid rgba(245,197,24,0.3);
+      color: var(--gold);
+      font-size: 12px;
+      font-weight: 600;
+      padding: 5px 14px;
+      border-radius: 20px;
+      margin-bottom: 24px;
+      letter-spacing: 0.5px;
+    }
+    .hero h1 {
+      font-family: 'Bangers', cursive;
+      font-size: clamp(42px, 8vw, 72px);
+      line-height: 1.05;
+      letter-spacing: 1px;
+      margin-bottom: 18px;
+    }
+    .hero h1 span { color: var(--gold); }
+    .hero p {
+      font-size: 17px;
+      color: var(--text-muted);
+      line-height: 1.6;
+      margin-bottom: 40px;
+    }
+    .search-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px;
+      text-align: left;
+    }
+    .search-row { display: flex; gap: 10px; margin-bottom: 12px; }
+    .search-row input { flex: 1; }
+    .search-row input:last-child { flex: 0 0 90px; }
+    input, select {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-size: 15px;
+      font-family: 'Inter', sans-serif;
+      padding: 12px 14px;
+      transition: border-color 0.2s;
+      outline: none;
+    }
+    input:focus, select:focus { border-color: var(--gold); }
+    input::placeholder { color: var(--text-dim); }
+    select option { background: var(--surface2); }
+    .search-results {
+      max-height: 280px;
+      overflow-y: auto;
+      margin-top: 10px;
+      display: none;
+    }
+    .search-results.show { display: block; }
+    .search-result-item {
+      padding: 12px 14px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: background 0.15s;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .search-result-item:hover { background: var(--surface3); }
+    .result-info { flex: 1; }
+    .result-title { font-weight: 600; font-size: 14px; }
+    .result-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+    .result-badge {
+      font-size: 11px; font-weight: 600;
+      padding: 3px 8px; border-radius: 20px;
+      background: var(--surface3);
+      color: var(--text-muted);
+    }
+    .result-badge.manga { background: rgba(138,43,226,0.2); color: #b06eff; }
+    .result-badge.bonelli { background: rgba(245,197,24,0.15); color: var(--gold); }
+    .result-badge.marvel { background: rgba(239,68,68,0.15); color: #f87171; }
+    .no-results { padding: 16px; text-align: center; color: var(--text-muted); font-size: 14px; }
+
+    /* STATS BAR */
+    .stats-bar {
+      display: flex; justify-content: center; gap: 40px;
+      padding: 40px 20px;
+      border-top: 1px solid var(--border);
+      margin-top: 60px;
+    }
+    .stat-item { text-align: center; }
+    .stat-number { font-family: 'Bangers', cursive; font-size: 36px; color: var(--gold); }
+    .stat-label { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+
+    /* HOW IT WORKS */
+    .section { padding: 60px 20px; max-width: 900px; margin: 0 auto; }
+    .section-title { font-family: 'Bangers', cursive; font-size: 36px; letter-spacing: 1px; margin-bottom: 8px; }
+    .section-sub { color: var(--text-muted); margin-bottom: 40px; }
+    .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
+    .step-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      text-align: center;
+    }
+    .step-icon { font-size: 36px; margin-bottom: 12px; }
+    .step-title { font-weight: 700; margin-bottom: 8px; }
+    .step-desc { font-size: 14px; color: var(--text-muted); line-height: 1.5; }
+
+    /* WAITLIST SECTION */
+    .waitlist-section {
+      background: linear-gradient(135deg, rgba(245,197,24,0.08), rgba(245,197,24,0.03));
+      border: 1px solid rgba(245,197,24,0.2);
+      border-radius: 20px;
+      padding: 40px;
+      text-align: center;
+      margin: 0 20px 60px;
+      max-width: 600px;
+      margin-left: auto; margin-right: auto;
+    }
+    .waitlist-section h2 { font-family: 'Bangers', cursive; font-size: 30px; letter-spacing: 1px; margin-bottom: 10px; }
+    .waitlist-section p { color: var(--text-muted); margin-bottom: 24px; }
+    .waitlist-form { display: flex; gap: 10px; max-width: 400px; margin: 0 auto; }
+    .waitlist-form input { flex: 1; }
+    @media (max-width: 480px) { .waitlist-form { flex-direction: column; } }
+
+    /* ── RESULT PAGE ── */
+    .result-page { max-width: 600px; margin: 0 auto; padding: 40px 20px; }
+    .back-btn { display: inline-flex; align-items: center; gap: 6px; color: var(--text-muted); font-size: 14px; cursor: pointer; margin-bottom: 24px; background: none; border: none; }
+    .back-btn:hover { color: var(--text); }
+    .result-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 32px;
+      text-align: center;
+    }
+    .result-category-badge {
+      display: inline-block;
+      font-size: 12px; font-weight: 600;
+      padding: 4px 12px; border-radius: 20px;
+      margin-bottom: 16px;
+    }
+    .result-series { font-family: 'Bangers', cursive; font-size: 32px; letter-spacing: 1px; margin-bottom: 4px; }
+    .result-issue { font-size: 15px; color: var(--text-muted); margin-bottom: 6px; }
+    .result-pub { font-size: 13px; color: var(--text-dim); margin-bottom: 28px; }
+    .value-display {
+      background: var(--surface2);
+      border-radius: 16px;
+      padding: 28px;
+      margin-bottom: 24px;
+    }
+    .value-label { font-size: 13px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+    .value-amount {
+      font-family: 'Bangers', cursive;
+      font-size: clamp(48px, 12vw, 72px);
+      color: var(--gold);
+      line-height: 1;
+    }
+    .value-condition { font-size: 13px; color: var(--text-muted); margin-top: 8px; }
+    .value-range {
+      display: flex; justify-content: space-between;
+      margin-top: 16px; padding-top: 16px;
+      border-top: 1px solid var(--border);
+    }
+    .range-item { text-align: center; }
+    .range-label { font-size: 11px; color: var(--text-dim); margin-bottom: 4px; }
+    .range-value { font-size: 14px; font-weight: 600; color: var(--text-muted); }
+    .result-actions { display: flex; flex-direction: column; gap: 10px; }
+    .share-card {
+      background: var(--surface2);
+      border: 1px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 16px;
+      word-break: break-all;
+    }
+    .condition-selector { margin: 20px 0; }
+    .condition-selector label { display: block; font-size: 13px; color: var(--text-muted); margin-bottom: 8px; }
+
+    /* ── COLLECTION PAGE ── */
+    .collection-page { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+    .collection-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; flex-wrap: wrap; gap: 12px; }
+    .collection-title { font-family: 'Bangers', cursive; font-size: 36px; letter-spacing: 1px; }
+    .collection-value-card {
+      background: linear-gradient(135deg, var(--surface), var(--surface2));
+      border: 1px solid rgba(245,197,24,0.3);
+      border-radius: 16px;
+      padding: 24px;
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 24px;
+      flex-wrap: wrap; gap: 16px;
+    }
+    .total-value-info h3 { font-size: 14px; color: var(--text-muted); margin-bottom: 4px; }
+    .total-value-amount { font-family: 'Bangers', cursive; font-size: 42px; color: var(--gold); }
+    .collection-meta { font-size: 13px; color: var(--text-muted); }
+    .collection-grid { display: grid; gap: 12px; }
+    .comic-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      display: flex; justify-content: space-between; align-items: center;
+      gap: 12px;
+      transition: border-color 0.2s;
+    }
+    .comic-card:hover { border-color: var(--surface3); }
+    .comic-card-info { flex: 1; }
+    .comic-card-title { font-weight: 600; font-size: 15px; }
+    .comic-card-sub { font-size: 13px; color: var(--text-muted); margin-top: 3px; }
+    .comic-card-cond { font-size: 12px; color: var(--text-dim); margin-top: 3px; }
+    .comic-card-value { font-family: 'Bangers', cursive; font-size: 22px; color: var(--gold); white-space: nowrap; }
+    .empty-collection {
+      text-align: center; padding: 60px 20px;
+      color: var(--text-muted);
+    }
+    .empty-icon { font-size: 56px; margin-bottom: 16px; }
+    .empty-collection h3 { font-size: 20px; margin-bottom: 8px; color: var(--text); }
+    .share-collection-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-top: 24px;
+      display: flex; justify-content: space-between; align-items: center;
+      flex-wrap: wrap; gap: 10px;
+    }
+    .share-collection-box p { font-size: 14px; color: var(--text-muted); }
+    .share-url { font-size: 12px; color: var(--text-dim); font-family: monospace; margin-top: 4px; }
+
+    /* ── MODAL ── */
+    .modal-overlay {
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(0,0,0,0.75);
+      display: flex; align-items: center; justify-content: center;
+      padding: 20px;
+      display: none;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 32px;
+      width: 100%;
+      max-width: 400px;
+      animation: slideUp 0.25s ease;
+    }
+    @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    .modal-title { font-family: 'Bangers', cursive; font-size: 28px; letter-spacing: 1px; margin-bottom: 24px; }
+    .modal-tabs { display: flex; gap: 4px; margin-bottom: 24px; background: var(--surface2); border-radius: var(--radius-sm); padding: 4px; }
+    .modal-tab { flex: 1; padding: 8px; text-align: center; font-size: 14px; font-weight: 600; cursor: pointer; border-radius: 6px; transition: all 0.2s; color: var(--text-muted); background: none; border: none; }
+    .modal-tab.active { background: var(--gold); color: #000; }
+    .form-group { margin-bottom: 16px; }
+    .form-label { display: block; font-size: 13px; color: var(--text-muted); margin-bottom: 6px; }
+    .form-error { color: var(--error); font-size: 13px; margin-top: 12px; text-align: center; }
+    .modal-close { position: absolute; top: 16px; right: 16px; background: none; border: none; color: var(--text-muted); font-size: 22px; cursor: pointer; }
+
+    /* ── TOAST ── */
+    #toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      background: var(--surface3); border: 1px solid var(--border);
+      color: var(--text); padding: 12px 24px; border-radius: 40px;
+      font-size: 14px; font-weight: 500;
+      z-index: 300; transition: all 0.3s;
+      opacity: 0; pointer-events: none;
+      white-space: nowrap;
+    }
+    #toast.show { opacity: 1; }
+    #toast.success { background: rgba(34,197,94,0.15); border-color: var(--success); color: var(--success); }
+    #toast.error { background: rgba(239,68,68,0.15); border-color: var(--error); color: var(--error); }
+
+    /* ── FOOTER ── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 30px 20px;
+      text-align: center;
+      color: var(--text-dim);
+      font-size: 13px;
+    }
+    footer a { color: var(--gold); text-decoration: none; }
+
+    /* ── UTILS ── */
+    .text-gold { color: var(--gold); }
+    .text-muted { color: var(--text-muted); }
+    .mt-8 { margin-top: 8px; } .mt-16 { margin-top: 16px; } .mt-24 { margin-top: 24px; }
+    .spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.2); border-top-color: currentColor; border-radius: 50%; animation: spin 0.7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    @media (max-width: 600px) {
+      .hero { padding: 50px 16px 40px; }
+      .stats-bar { gap: 24px; flex-wrap: wrap; }
+      .collection-value-card { flex-direction: column; }
+      .comic-card { flex-direction: column; align-items: flex-start; }
+      .search-row { flex-direction: column; }
+      .search-row input:last-child { flex: auto; }
+      .nav-logo { font-size: 22px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav>
+  <div class="nav-logo" onclick="showPage('home')">Fumetto<span>Quota</span></div>
+  <div class="nav-actions">
+    <div id="nav-user" style="display:none"></div>
+    <button class="btn btn-outline btn-sm" id="nav-collection-btn" style="display:none" onclick="showPage('collection')">📦 Collezione</button>
+    <button class="btn btn-ghost btn-sm" id="nav-logout-btn" style="display:none" onclick="logout()">Esci</button>
+    <button class="btn btn-gold btn-sm" id="nav-login-btn" onclick="openAuth()">Accedi</button>
+  </div>
+</nav>
+
+<!-- ████ PAGE: HOME ████ -->
+<div id="page-home" class="page active">
+  <div class="hero">
+    <div class="hero-badge">🇮🇹 Il primo strumento italiano per collezionisti</div>
+    <h1>Quanto vale<br><span>la tua collezione?</span></h1>
+    <p>Scopri il valore reale dei tuoi fumetti in pochi secondi.<br>Dylan Dog, Tex, manga, Marvel e molto altro.</p>
+
+    <div class="search-box">
+      <div class="search-row">
+        <input type="text" id="search-input" placeholder="Cerca fumetto (es. Dylan Dog, Naruto, Tex...)" autocomplete="off">
+        <input type="number" id="search-number" placeholder="n°" min="1" max="9999">
+      </div>
+      <div id="search-results" class="search-results"></div>
+    </div>
+  </div>
+
+  <!-- STATS -->
+  <div class="stats-bar">
+    <div class="stat-item"><div class="stat-number">80+</div><div class="stat-label">Fumetti nel database</div></div>
+    <div class="stat-item"><div class="stat-number">6</div><div class="stat-label">Livelli di condizione</div></div>
+    <div class="stat-item"><div class="stat-number">100%</div><div class="stat-label">Gratuito</div></div>
+  </div>
+
+  <!-- HOW IT WORKS -->
+  <div class="section">
+    <div class="section-title">Come funziona</div>
+    <div class="section-sub">Tre passaggi, zero complicazioni</div>
+    <div class="steps">
+      <div class="step-card">
+        <div class="step-icon">🔍</div>
+        <div class="step-title">Cerca il fumetto</div>
+        <div class="step-desc">Digita il titolo e il numero dell'albo che vuoi valutare</div>
+      </div>
+      <div class="step-card">
+        <div class="step-icon">📊</div>
+        <div class="step-title">Seleziona la condizione</div>
+        <div class="step-desc">Da Perfetto (Mint) a Usurato (Poor): scegli lo stato reale dell'albo</div>
+      </div>
+      <div class="step-card">
+        <div class="step-icon">💰</div>
+        <div class="step-title">Scopri il valore</div>
+        <div class="step-desc">Ottieni la stima in euro e condividila o salvala nella tua collezione</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- WAITLIST -->
+  <div class="waitlist-section">
+    <h2>🚀 Il marketplace sta arrivando</h2>
+    <p>Stiamo costruendo il primo posto dedicato per comprare e vendere fumetti tra collezionisti italiani. Iscriviti per essere tra i primi.</p>
+    <div class="waitlist-form">
+      <input type="email" id="waitlist-email" placeholder="La tua email">
+      <button class="btn btn-gold" onclick="joinWaitlist()">Iscrivimi</button>
+    </div>
+    <p class="text-muted mt-8" style="font-size:12px">Niente spam. Solo la notifica di lancio.</p>
+  </div>
+
+  <footer>
+    <p>© 2024 FumettoQuota — Il primo strumento italiano per valutare fumetti</p>
+    <p class="mt-8">Le quotazioni sono stime basate su prezzi di mercato. <a href="#">Informativa Privacy</a></p>
+  </footer>
+</div>
+
+<!-- ████ PAGE: RESULT ████ -->
+<div id="page-result" class="page">
+  <div class="result-page">
+    <button class="back-btn" onclick="showPage('home')">← Nuova ricerca</button>
+    <div class="result-card" id="result-card">
+      <!-- populated by JS -->
+    </div>
+    <div id="add-to-collection-area" style="margin-top:16px; display:none">
+      <button class="btn btn-gold" style="width:100%" onclick="addToCollection()">+ Aggiungi alla mia collezione</button>
+    </div>
+    <div id="login-to-save" style="margin-top:12px; text-align:center; display:none">
+      <p style="font-size:14px; color:var(--text-muted)">
+        <button class="btn btn-outline btn-sm" onclick="openAuth()">Accedi</button> per salvare questo fumetto nella tua collezione
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- ████ PAGE: COLLECTION ████ -->
+<div id="page-collection" class="page">
+  <div class="collection-page">
+    <div class="collection-header">
+      <div class="collection-title">La mia Collezione</div>
+      <button class="btn btn-gold btn-sm" onclick="showPage('home')">+ Aggiungi fumetto</button>
+    </div>
+    <div id="collection-content">
+      <!-- populated by JS -->
+    </div>
+  </div>
+</div>
+
+<!-- ████ PAGE: SHARE ████ -->
+<div id="page-share" class="page">
+  <div class="result-page">
+    <button class="back-btn" onclick="showPage('home')">← Home</button>
+    <div id="share-content"><!-- populated by JS --></div>
+  </div>
+</div>
+
+<!-- AUTH MODAL -->
+<div class="modal-overlay" id="auth-modal">
+  <div class="modal" style="position:relative">
+    <button class="modal-close" onclick="closeAuth()">✕</button>
+    <div class="modal-title">FumettoQuota</div>
+    <div class="modal-tabs">
+      <button class="modal-tab active" id="tab-login" onclick="switchTab('login')">Accedi</button>
+      <button class="modal-tab" id="tab-register" onclick="switchTab('register')">Registrati</button>
+    </div>
+    <!-- Login Form -->
+    <div id="form-login">
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input type="email" id="login-email" placeholder="la-tua@email.it">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input type="password" id="login-password" placeholder="••••••">
+      </div>
+      <div class="form-error" id="login-error"></div>
+      <button class="btn btn-gold" style="width:100%;margin-top:8px" id="login-btn" onclick="doLogin()">Accedi</button>
+    </div>
+    <!-- Register Form -->
+    <div id="form-register" style="display:none">
+      <div class="form-group">
+        <label class="form-label">Nome</label>
+        <input type="text" id="reg-name" placeholder="Il tuo nome">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input type="email" id="reg-email" placeholder="la-tua@email.it">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password (min. 6 caratteri)</label>
+        <input type="password" id="reg-password" placeholder="••••••">
+      </div>
+      <div class="form-error" id="reg-error"></div>
+      <button class="btn btn-gold" style="width:100%;margin-top:8px" id="reg-btn" onclick="doRegister()">Crea account gratuito</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<script>
+  // ─── STATE ───────────────────────────────────────────────────
+  let currentUser = null;
+  let currentComic = null;
+  let currentCondition = 'good';
+  let searchTimeout = null;
+
+  const CONDITIONS = [
+    { value: 'mint',       label: 'Perfetto (Mint)',           desc: 'Come nuovo, mai letto' },
+    { value: 'near-mint',  label: 'Quasi Perfetto (Near Mint)',desc: 'Minime imperfezioni' },
+    { value: 'very-good',  label: 'Molto Buono (Very Good)',   desc: 'Piccoli segni d\'uso' },
+    { value: 'good',       label: 'Buono (Good)',              desc: 'Segni d\'uso normali' },
+    { value: 'fair',       label: 'Discreto (Fair)',           desc: 'Usura visibile' },
+    { value: 'poor',       label: 'Usurato (Poor)',            desc: 'Molto rovinato' },
+  ];
+
+  const CATEGORY_COLORS = {
+    'Fumetti Italiani': { bg: 'rgba(245,197,24,0.15)', color: '#f5c518' },
+    'Manga': { bg: 'rgba(138,43,226,0.2)', color: '#b06eff' },
+    'Marvel/DC': { bg: 'rgba(239,68,68,0.15)', color: '#f87171' },
+    "Fumetti d'Autore": { bg: 'rgba(34,197,94,0.15)', color: '#22c55e' },
+  };
+
+  // ─── INIT ────────────────────────────────────────────────────
+  window.addEventListener('DOMContentLoaded', async () => {
+    await checkAuth();
+    handleRoute();
+    setupSearch();
+    document.getElementById('login-password').addEventListener('keydown', e => e.key === 'Enter' && doLogin());
+    document.getElementById('reg-password').addEventListener('keydown', e => e.key === 'Enter' && doRegister());
+  });
+
+  window.addEventListener('popstate', handleRoute);
+
+  function handleRoute() {
+    const hash = window.location.hash;
+    if (hash.startsWith('#share/')) {
+      const userId = hash.slice(7);
+      loadSharePage(userId);
+    } else if (hash === '#collection') {
+      if (currentUser) showPage('collection', false);
+      else showPage('home', false);
+    } else {
+      showPage('home', false);
+    }
+  }
+
+  // ─── PAGES ───────────────────────────────────────────────────
+  function showPage(name, updateHash = true) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById('page-' + name).classList.add('active');
+    window.scrollTo(0, 0);
+    if (updateHash) {
+      if (name === 'home') history.pushState(null, '', '/');
+      else if (name === 'collection') history.pushState(null, '', '#collection');
+    }
+    if (name === 'collection') loadCollection();
+  }
+
+  // ─── AUTH ────────────────────────────────────────────────────
+  async function checkAuth() {
+    try {
+      const res = await fetch('/api/me');
+      currentUser = await res.json();
+    } catch { currentUser = null; }
+    updateNavbar();
+  }
+
+  function updateNavbar() {
+    const loginBtn = document.getElementById('nav-login-btn');
+    const logoutBtn = document.getElementById('nav-logout-btn');
+    const collBtn = document.getElementById('nav-collection-btn');
+    const userEl = document.getElementById('nav-user');
+    if (currentUser) {
+      loginBtn.style.display = 'none';
+      logoutBtn.style.display = 'inline-flex';
+      collBtn.style.display = 'inline-flex';
+      userEl.style.display = 'block';
+      userEl.innerHTML = `Ciao, <strong>${currentUser.name.split(' ')[0]}</strong>`;
+    } else {
+      loginBtn.style.display = 'inline-flex';
+      logoutBtn.style.display = 'none';
+      collBtn.style.display = 'none';
+      userEl.style.display = 'none';
+    }
+  }
+
+  function openAuth() { document.getElementById('auth-modal').classList.add('open'); }
+  function closeAuth() { document.getElementById('auth-modal').classList.remove('open'); }
+  function switchTab(tab) {
+    document.getElementById('form-login').style.display = tab === 'login' ? 'block' : 'none';
+    document.getElementById('form-register').style.display = tab === 'register' ? 'block' : 'none';
+    document.getElementById('tab-login').classList.toggle('active', tab === 'login');
+    document.getElementById('tab-register').classList.toggle('active', tab === 'register');
+  }
+
+  async function doLogin() {
+    const email = document.getElementById('login-email').value.trim();
+    const password = document.getElementById('login-password').value;
+    const errEl = document.getElementById('login-error');
+    const btn = document.getElementById('login-btn');
+    errEl.textContent = '';
+    if (!email || !password) { errEl.textContent = 'Inserisci email e password'; return; }
+    btn.innerHTML = '<span class="spinner"></span>';
+    btn.disabled = true;
+    try {
+      const res = await fetch('/api/login', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({email,password}) });
+      const data = await res.json();
+      if (!res.ok) { errEl.textContent = data.error; return; }
+      currentUser = data;
+      updateNavbar();
+      closeAuth();
+      showToast('Bentornato, ' + currentUser.name.split(' ')[0] + '! 👋', 'success');
+      updateResultActions();
+    } catch { errEl.textContent = 'Errore di connessione'; }
+    finally { btn.innerHTML = 'Accedi'; btn.disabled = false; }
+  }
+
+  async function doRegister() {
+    const name = document.getElementById('reg-name').value.trim();
+    const email = document.getElementById('reg-email').value.trim();
+    const password = document.getElementById('reg-password').value;
+    const errEl = document.getElementById('reg-error');
+    const btn = document.getElementById('reg-btn');
+    errEl.textContent = '';
+    if (!name || !email || !password) { errEl.textContent = 'Compila tutti i campi'; return; }
+    btn.innerHTML = '<span class="spinner"></span>';
+    btn.disabled = true;
+    try {
+      const res = await fetch('/api/register', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name,email,password}) });
+      const data = await res.json();
+      if (!res.ok) { errEl.textContent = data.error; return; }
+      currentUser = data;
+      updateNavbar();
+      closeAuth();
+      showToast('Account creato! Benvenuto in FumettoQuota 🎉', 'success');
+      updateResultActions();
+    } catch { errEl.textContent = 'Errore di connessione'; }
+    finally { btn.innerHTML = 'Crea account gratuito'; btn.disabled = false; }
+  }
+
+  async function logout() {
+    await fetch('/api/logout', { method: 'POST' });
+    currentUser = null;
+    updateNavbar();
+    showPage('home');
+    showToast('Arrivederci! 👋');
+  }
+
+  // ─── SEARCH ──────────────────────────────────────────────────
+  function setupSearch() {
+    const input = document.getElementById('search-input');
+    const numInput = document.getElementById('search-number');
+    input.addEventListener('input', () => {
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(doSearch, 300);
+    });
+    numInput.addEventListener('input', () => {
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(doSearch, 300);
+    });
+    document.addEventListener('click', e => {
+      if (!e.target.closest('.search-box')) {
+        document.getElementById('search-results').classList.remove('show');
+      }
+    });
+    input.addEventListener('focus', () => { if (input.value.length >= 2) doSearch(); });
+  }
+
+  async function doSearch() {
+    const q = document.getElementById('search-input').value.trim();
+    const n = document.getElementById('search-number').value.trim();
+    const container = document.getElementById('search-results');
+    if (q.length < 2) { container.classList.remove('show'); return; }
+    try {
+      const url = `/api/comics/search?q=${encodeURIComponent(q)}${n ? '&n=' + n : ''}`;
+      const res = await fetch(url);
+      const comics = await res.json();
+      container.classList.add('show');
+      if (comics.length === 0) {
+        container.innerHTML = `<div class="no-results">Nessun risultato per "${q}".<br><small>Database in continua espansione 📚</small></div>`;
+        return;
+      }
+      container.innerHTML = comics.map(c => {
+        const cat = c.category;
+        const badgeClass = cat === 'Manga' ? 'manga' : (cat === 'Fumetti Italiani' ? 'bonelli' : (cat === 'Marvel/DC' ? 'marvel' : ''));
+        return `<div class="search-result-item" onclick="selectComic(${c.id})">
+          <div class="result-info">
+            <div class="result-title">${c.series} n. ${c.number}</div>
+            <div class="result-sub">${c.title} · ${c.publisher} · ${c.year}</div>
+          </div>
+          <span class="result-badge ${badgeClass}">${cat}</span>
+        </div>`;
+      }).join('');
+    } catch { container.classList.remove('show'); }
+  }
+
+  async function selectComic(id) {
+    document.getElementById('search-results').classList.remove('show');
+    await loadResult(id, currentCondition);
+  }
+
+  // ─── RESULT ──────────────────────────────────────────────────
+  async function loadResult(id, condition) {
+    try {
+      const res = await fetch(`/api/comics/${id}/value?condition=${condition}`);
+      const data = await res.json();
+      if (!res.ok) { showToast('Fumetto non trovato', 'error'); return; }
+      currentComic = data;
+      currentCondition = condition;
+      renderResult(data);
+      showPage('result');
+    } catch { showToast('Errore di connessione', 'error'); }
+  }
+
+  function renderResult(data) {
+    const colors = CATEGORY_COLORS[data.category] || { bg: 'rgba(255,255,255,0.08)', color: '#fff' };
+    const allValues = CONDITIONS.map(c => {
+      const mult = { mint:1, 'near-mint':0.75, 'very-good':0.5, good:0.3, fair:0.15, poor:0.05 }[c.value];
+      return Math.round(data.baseValue * mult);
+    });
+    const maxVal = Math.max(...allValues);
+    const minVal = Math.min(...allValues);
+
+    const condOptions = CONDITIONS.map(c =>
+      `<option value="${c.value}" ${c.value === currentCondition ? 'selected' : ''}>${c.label}</option>`
+    ).join('');
+
+    document.getElementById('result-card').innerHTML = `
+      <span class="result-category-badge" style="background:${colors.bg};color:${colors.color}">${data.category}</span>
+      <div class="result-series">${data.series}</div>
+      <div class="result-issue">N. ${data.number} · ${data.year}</div>
+      <div class="result-pub">${data.title} — ${data.publisher}</div>
+      <div class="condition-selector">
+        <label>Condizione dell'albo</label>
+        <select onchange="changeCondition(${data.id}, this.value)">${condOptions}</select>
+      </div>
+      <div class="value-display">
+        <div class="value-label">Valore stimato</div>
+        <div class="value-amount">€${data.estimatedValue}</div>
+        <div class="value-condition">${data.conditionLabel}</div>
+        <div class="value-range">
+          <div class="range-item"><div class="range-label">Valore Mint</div><div class="range-value">€${maxVal}</div></div>
+          <div class="range-item"><div class="range-label">Valore medio</div><div class="range-value">€${Math.round(data.baseValue * 0.3)}</div></div>
+          <div class="range-item"><div class="range-label">Valore Poor</div><div class="range-value">€${minVal}</div></div>
+        </div>
+      </div>
+      <button class="btn btn-outline" style="width:100%" onclick="shareResult()">📤 Condividi questa valutazione</button>
+    `;
+    updateResultActions();
+  }
+
+  function changeCondition(id, condition) {
+    currentCondition = condition;
+    loadResult(id, condition);
+  }
+
+  function updateResultActions() {
+    const addBtn = document.getElementById('add-to-collection-area');
+    const loginHint = document.getElementById('login-to-save');
+    if (!addBtn) return;
+    if (currentUser) { addBtn.style.display = 'block'; loginHint.style.display = 'none'; }
+    else { addBtn.style.display = 'none'; loginHint.style.display = 'block'; }
+  }
+
+  async function addToCollection() {
+    if (!currentComic || !currentUser) return;
+    try {
+      const res = await fetch('/api/collection', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ comicId: currentComic.id, condition: currentCondition, notes: '' })
+      });
+      if (res.ok) {
+        showToast('Aggiunto alla collezione! 📦', 'success');
+        document.getElementById('add-to-collection-area').innerHTML =
+          '<p style="text-align:center;color:var(--success);font-size:14px">✅ Salvato nella tua collezione — <button class="btn btn-ghost btn-sm" onclick="showPage(\'collection\')">Vedi collezione →</button></p>';
+      } else {
+        const d = await res.json();
+        showToast(d.error || 'Errore', 'error');
+      }
+    } catch { showToast('Errore di connessione', 'error'); }
+  }
+
+  function shareResult() {
+    if (!currentComic) return;
+    const text = `Ho scoperto che il mio ${currentComic.series} n.${currentComic.number} vale €${currentComic.estimatedValue}! Scopri quanto vale la tua collezione su FumettoQuota 📚`;
+    if (navigator.share) {
+      navigator.share({ title: 'FumettoQuota', text, url: window.location.href });
+    } else {
+      navigator.clipboard.writeText(text).then(() => showToast('Testo copiato! Incollalo dove vuoi 📋', 'success'));
+    }
+  }
+
+  // ─── COLLECTION ──────────────────────────────────────────────
+  async function loadCollection() {
+    const container = document.getElementById('collection-content');
+    container.innerHTML = '<div style="text-align:center;padding:40px"><span class="spinner" style="width:32px;height:32px;border-width:3px"></span></div>';
+    try {
+      const res = await fetch('/api/collection');
+      const items = await res.json();
+      const total = items.reduce((s, i) => s + i.estimatedValue, 0);
+      if (items.length === 0) {
+        container.innerHTML = `
+          <div class="empty-collection">
+            <div class="empty-icon">📚</div>
+            <h3>La tua collezione è vuota</h3>
+            <p>Cerca un fumetto e aggiungilo alla tua collezione</p>
+            <button class="btn btn-gold mt-16" onclick="showPage('home')">Cerca fumetti</button>
+          </div>`;
+        return;
+      }
+      container.innerHTML = `
+        <div class="collection-value-card">
+          <div class="total-value-info">
+            <h3>Valore totale stimato</h3>
+            <div class="total-value-amount">€${total}</div>
+          </div>
+          <div class="collection-meta">
+            <div>${items.length} alb${items.length === 1 ? 'o' : 'i'} in collezione</div>
+          </div>
+        </div>
+        <div class="collection-grid">
+          ${items.map(item => `
+            <div class="comic-card">
+              <div class="comic-card-info">
+                <div class="comic-card-title">${item.series} n. ${item.number}</div>
+                <div class="comic-card-sub">${item.title} · ${item.publisher}</div>
+                <div class="comic-card-cond">${item.conditionLabel}</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:12px">
+                <div class="comic-card-value">€${item.estimatedValue}</div>
+                <button class="btn btn-danger btn-sm" onclick="removeItem('${item.id}')">✕</button>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+        <div class="share-collection-box">
+          <div>
+            <p>Condividi la tua collezione</p>
+            <div class="share-url">${window.location.origin}#share/${currentUser.id}</div>
+          </div>
+          <button class="btn btn-outline btn-sm" onclick="copyShareLink()">📤 Copia link</button>
+        </div>`;
+    } catch { container.innerHTML = '<p style="color:var(--error);text-align:center">Errore nel caricamento</p>'; }
+  }
+
+  async function removeItem(itemId) {
+    try {
+      await fetch(`/api/collection/${itemId}`, { method: 'DELETE' });
+      loadCollection();
+      showToast('Rimosso dalla collezione');
+    } catch { showToast('Errore', 'error'); }
+  }
+
+  function copyShareLink() {
+    if (!currentUser) return;
+    const url = `${window.location.origin}#share/${currentUser.id}`;
+    navigator.clipboard.writeText(url).then(() => showToast('Link copiato! 🔗', 'success'));
+  }
+
+  // ─── SHARE PAGE ──────────────────────────────────────────────
+  async function loadSharePage(userId) {
+    showPage('share', false);
+    const container = document.getElementById('share-content');
+    container.innerHTML = '<div style="text-align:center;padding:40px"><span class="spinner" style="width:32px;height:32px;border-width:3px"></span></div>';
+    try {
+      const res = await fetch(`/api/share/${userId}`);
+      if (!res.ok) { container.innerHTML = '<p style="color:var(--error)">Collezione non trovata</p>'; return; }
+      const data = await res.json();
+      container.innerHTML = `
+        <div style="text-align:center;margin-bottom:32px">
+          <div class="hero-badge">Collezione pubblica</div>
+          <h1 style="font-family:'Bangers',cursive;font-size:36px;letter-spacing:1px;margin:12px 0">${data.owner}</h1>
+          <p style="color:var(--text-muted)">${data.count} fumett${data.count===1?'o':'i'} · Valore totale <strong class="text-gold">€${data.totalValue}</strong></p>
+        </div>
+        <div class="collection-grid">
+          ${data.collection.map(item => `
+            <div class="comic-card">
+              <div class="comic-card-info">
+                <div class="comic-card-title">${item.series} n. ${item.number}</div>
+                <div class="comic-card-sub">${item.title} · ${item.publisher}</div>
+                <div class="comic-card-cond">${item.conditionLabel}</div>
+              </div>
+              <div class="comic-card-value">€${item.estimatedValue}</div>
+            </div>`).join('')}
+        </div>
+        <div style="text-align:center;margin-top:32px">
+          <p style="color:var(--text-muted);margin-bottom:12px">Scopri quanto vale la tua collezione</p>
+          <button class="btn btn-gold" onclick="showPage('home')">Valuta i tuoi fumetti →</button>
+        </div>`;
+    } catch { container.innerHTML = '<p style="color:var(--error)">Errore nel caricamento</p>'; }
+  }
+
+  // ─── WAITLIST ────────────────────────────────────────────────
+  async function joinWaitlist() {
+    const email = document.getElementById('waitlist-email').value.trim();
+    if (!email || !email.includes('@')) { showToast('Inserisci una email valida', 'error'); return; }
+    try {
+      const res = await fetch('/api/waitlist', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({email}) });
+      if (res.ok) {
+        document.getElementById('waitlist-email').value = '';
+        showToast('Sei in lista! Ti avviseremo al lancio 🚀', 'success');
+      }
+    } catch { showToast('Errore, riprova', 'error'); }
+  }
+
+  // ─── TOAST ───────────────────────────────────────────────────
+  let toastTimeout;
+  function showToast(msg, type = '') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = `show ${type}`;
+    clearTimeout(toastTimeout);
+    toastTimeout = setTimeout(() => t.className = '', 3000);
+  }
+
+  // ─── PWA SERVICE WORKER ──────────────────────────────────────
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  }
+</script>
+</body>
+</html>
