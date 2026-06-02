@@ -4,11 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
   <meta name="theme-color" content="#0a0a0a">
-  <meta name="description" content="FumettoQuota - Scopri il valore della tua collezione di fumetti italiani, manga e comics">
-  <meta property="og:title" content="FumettoQuota - Quanto vale la tua collezione?">
+  <meta name="description" content="Scopri il valore della tua collezione di fumetti italiani, manga e comics">
+  <meta property="og:title" content="Quanto vale la tua collezione?">
   <meta property="og:description" content="Scopri il valore reale dei tuoi fumetti in pochi secondi. Gratis, in italiano.">
   <meta property="og:image" content="/icon-512.png">
-  <title>FumettoQuota — Quanto vale la tua collezione?</title>
+  <title>Quanto vale la tua collezione?</title>
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icon-192.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -393,7 +393,7 @@
 
 <!-- NAVBAR -->
 <nav>
-  <div class="nav-logo" onclick="showPage('home')">Fumetto<span>Quota</span></div>
+  <div class="nav-logo" onclick="showPage('home')"></div>
   <div class="nav-actions">
     <div id="nav-user" style="display:none"></div>
     <button class="btn btn-outline btn-sm" id="nav-collection-btn" style="display:none" onclick="showPage('collection')">📦 Collezione</button>
@@ -460,7 +460,7 @@
   </div>
 
   <footer>
-    <p>© 2024 FumettoQuota — Il primo strumento italiano per valutare fumetti</p>
+    <p>© 2024 — Il primo strumento italiano per valutare fumetti</p>
     <p class="mt-8">Le quotazioni sono stime basate su prezzi di mercato. <a href="#">Informativa Privacy</a></p>
   </footer>
 </div>
@@ -508,7 +508,7 @@
 <div class="modal-overlay" id="auth-modal">
   <div class="modal" style="position:relative">
     <button class="modal-close" onclick="closeAuth()">✕</button>
-    <div class="modal-title">FumettoQuota</div>
+    <div class="modal-title"></div>
     <div class="modal-tabs">
       <button class="modal-tab active" id="tab-login" onclick="switchTab('login')">Accedi</button>
       <button class="modal-tab" id="tab-register" onclick="switchTab('register')">Registrati</button>
@@ -684,7 +684,7 @@
       currentUser = data;
       updateNavbar();
       closeAuth();
-      showToast('Account creato! Benvenuto in FumettoQuota 🎉', 'success');
+      showToast('Account creato! Benvenuto 🎉', 'success');
       updateResultActions();
     } catch { errEl.textContent = 'Errore di connessione'; }
     finally { btn.innerHTML = 'Crea account gratuito'; btn.disabled = false; }
@@ -835,9 +835,9 @@
 
   function shareResult() {
     if (!currentComic) return;
-    const text = `Ho scoperto che il mio ${currentComic.series} n.${currentComic.number} vale €${currentComic.estimatedValue}! Scopri quanto vale la tua collezione su FumettoQuota 📚`;
+    const text = `Ho scoperto che il mio ${currentComic.series} n.${currentComic.number} vale €${currentComic.estimatedValue}! Scopri quanto vale la tua collezione 📚`;
     if (navigator.share) {
-      navigator.share({ title: 'FumettoQuota', text, url: window.location.href });
+      navigator.share({ title: 'La mia collezione', text, url: window.location.href });
     } else {
       navigator.clipboard.writeText(text).then(() => showToast('Testo copiato! Incollalo dove vuoi 📋', 'success'));
     }
