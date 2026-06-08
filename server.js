@@ -153,6 +153,8 @@ const conditionLabels = {
   'poor': 'Usurato (Poor)'
 };
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 // ─── MIDDLEWARE ───────────────────────────────────────────────
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -171,6 +173,9 @@ function requireAuth(req, res, next) {
 
 // ─── STATS (per admin) ────────────────────────────────────────
 app.get('/api/admin/stats', (req, res) => {
+  const adminToken = process.env.ADMIN_TOKEN;
+  if (adminToken && req.query.token !== adminToken)
+    return res.status(401).json({ error: 'Non autorizzato' });
   const users = readJSON(USERS_FILE);
   const collections = readJSON(COLLECTIONS_FILE);
   const waitlist = readJSON(WAITLIST_FILE);
@@ -210,6 +215,7 @@ app.get('/api/comics/:id/value', (req, res) => {
 app.post('/api/register', async (req, res) => {
   const { email, password, name } = req.body;
   if (!email || !password || !name) return res.status(400).json({ error: 'Tutti i campi sono obbligatori' });
+  if (!EMAIL_RE.test(email)) return res.status(400).json({ error: 'Email non valida' });
   if (password.length < 6) return res.status(400).json({ error: 'La password deve avere almeno 6 caratteri' });
   const users = readJSON(USERS_FILE);
   if (users.find(u => u.email.toLowerCase() === email.toLowerCase()))
@@ -301,7 +307,7 @@ app.get('/api/share/:userId', (req, res) => {
 // ─── WAITLIST ─────────────────────────────────────────────────
 app.post('/api/waitlist', (req, res) => {
   const { email } = req.body;
-  if (!email || !email.includes('@')) return res.status(400).json({ error: 'Email non valida' });
+  if (!email || !EMAIL_RE.test(email)) return res.status(400).json({ error: 'Email non valida' });
   const waitlist = readJSON(WAITLIST_FILE);
   if (!waitlist.includes(email.toLowerCase())) {
     waitlist.push(email.toLowerCase());
