@@ -2,14 +2,14 @@
 <html lang="it">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Grand Line Survivors ⚓ Roguelite</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Pirata+One&family=Baloo+2:wght@500;700;800&display=swap" rel="stylesheet">
 <style>
   * { margin:0; padding:0; box-sizing:border-box; user-select:none; -webkit-user-select:none; }
-  html,body { width:100%; height:100%; overflow:hidden; background:#06121f; font-family:'Baloo 2',sans-serif; color:#fff; }
+  html,body { width:100%; height:100%; overflow:hidden; background:#06121f; font-family:'Baloo 2',sans-serif; color:#fff; touch-action:none; overscroll-behavior:none; }
   canvas { display:block; }
   #c { position:fixed; inset:0; }
 
@@ -119,6 +119,27 @@
 
   #muteBtn { position:fixed; bottom:14px; right:16px; z-index:20; font-size:22px; cursor:pointer; opacity:.7; }
   #muteBtn:hover { opacity:1; }
+
+  /* ---------- touch controls ---------- */
+  #touchUI { position:fixed; inset:0; z-index:9; pointer-events:none; }
+  #joyBase { position:absolute; width:124px; height:124px; border-radius:50%; border:3px solid rgba(255,255,255,.35); background:rgba(255,255,255,.07); transform:translate(-50%,-50%); display:none; }
+  #joyKnob { position:absolute; width:56px; height:56px; border-radius:50%; background:rgba(255,255,255,.5); box-shadow:0 0 14px rgba(0,0,0,.4); transform:translate(-50%,-50%); display:none; }
+  .tbtn {
+    position:absolute; pointer-events:auto; width:76px; height:76px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center; font-size:32px;
+    background:rgba(13,34,58,.65); border:3px solid #d8a73c; box-shadow:0 4px 16px rgba(0,0,0,.5);
+  }
+  .tbtn:active { filter:brightness(1.4); }
+  #btnSpec { right:24px; bottom:118px; }
+  #btnDash { right:118px; bottom:30px; }
+  #btnSpec.charged { background:rgba(51,214,255,.5); border-color:#7dffea; animation:pulse 0.9s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{ transform:scale(1);} 50%{ transform:scale(1.12);} }
+  @media (pointer:coarse) {
+    .panel { padding:22px 18px; }
+    .btn { font-size:18px; padding:11px 26px; }
+    .card { width:160px; }
+    #ctrlHint { display:none; }
+  }
 
   .shopRow { display:flex; align-items:center; justify-content:space-between; gap:16px; background:#0e2740; border:2px solid #2c4d72; border-radius:12px; padding:12px 18px; margin-top:12px; text-align:left; }
   .shopRow .info b { color:#ffe9a8; font-size:17px; }
@@ -239,6 +260,15 @@
 
 <div id="muteBtn" title="Audio (M)">🔊</div>
 
+<!-- TOUCH CONTROLS -->
+<div id="touchUI" class="hidden">
+  <div id="joyBase"></div><div id="joyKnob"></div>
+  <div class="tbtn" id="btnDash">💨</div>
+  <div class="tbtn" id="btnSpec">🔱</div>
+  <div class="tbtn" id="btnPause" style="right:14px; top:84px; width:50px; height:50px; font-size:20px;">⏸</div>
+</div>
+
+<script async src="https://unpkg.com/es-module-shims@1.8.3/dist/es-module-shims.js"></script>
 <script type="importmap">
 { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
 </script>
@@ -348,8 +378,9 @@ const META = [
 ];
 
 /* ============================== THREE SETUP ============================== */
-const renderer = new THREE.WebGLRenderer({ canvas: $('c'), antialias: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+const isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
+const renderer = new THREE.WebGLRenderer({ canvas: $('c'), antialias: !isTouch });
+renderer.setPixelRatio(Math.min(devicePixelRatio, isTouch ? 1.5 : 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -376,7 +407,7 @@ const toon = (color, opt = {}) => new THREE.MeshToonMaterial(Object.assign({ col
 const hemi = new THREE.HemisphereLight(0xcfe8ff, 0x5a7a99, 1.0); scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xfff3d0, 1.9);
 sun.position.set(28, 42, 18); sun.castShadow = true;
-sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.mapSize.set(isTouch ? 1024 : 2048, isTouch ? 1024 : 2048);
 sun.shadow.camera.left = -45; sun.shadow.camera.right = 45;
 sun.shadow.camera.top = 45; sun.shadow.camera.bottom = -45;
 sun.shadow.camera.far = 140; sun.shadow.bias = -0.0005;
@@ -740,12 +771,68 @@ addEventListener('keydown', e => {
 addEventListener('keyup', e => keys[e.code] = false);
 addEventListener('pointerdown', () => { if (actx === null && !muted) ac(); }, { once: true });
 
+/* ---------- touch: joystick virtuale + pulsanti ---------- */
+const touch = { id: null, ox: 0, oy: 0, vx: 0, vz: 0, dashQ: 0 };
+const joyBase = $('joyBase'), joyKnob = $('joyKnob');
+function joyShow(x, y) {
+  joyBase.style.display = joyKnob.style.display = 'block';
+  joyBase.style.left = joyKnob.style.left = x + 'px';
+  joyBase.style.top = joyKnob.style.top = y + 'px';
+}
+function joyHide() {
+  joyBase.style.display = joyKnob.style.display = 'none';
+  touch.id = null; touch.vx = 0; touch.vz = 0;
+}
+addEventListener('touchstart', e => {
+  if (G.state !== 'play') return;
+  for (const t of e.changedTouches) {
+    if (touch.id === null && t.clientX < innerWidth * 0.55) {
+      e.preventDefault();
+      touch.id = t.identifier; touch.ox = t.clientX; touch.oy = t.clientY;
+      touch.vx = 0; touch.vz = 0;
+      joyShow(t.clientX, t.clientY);
+    }
+  }
+}, { passive: false });
+addEventListener('touchmove', e => {
+  if (touch.id === null) return;
+  for (const t of e.changedTouches) {
+    if (t.identifier !== touch.id) continue;
+    e.preventDefault();
+    let dx = t.clientX - touch.ox, dy = t.clientY - touch.oy;
+    const len = Math.hypot(dx, dy), maxR = 58;
+    if (len > maxR) { dx *= maxR / len; dy *= maxR / len; }
+    touch.vx = dx / maxR; touch.vz = dy / maxR;
+    joyKnob.style.left = (touch.ox + dx) + 'px';
+    joyKnob.style.top = (touch.oy + dy) + 'px';
+  }
+}, { passive: false });
+const touchEnd = e => {
+  for (const t of e.changedTouches) if (t.identifier === touch.id) joyHide();
+};
+addEventListener('touchend', touchEnd);
+addEventListener('touchcancel', touchEnd);
+$('btnDash').addEventListener('touchstart', e => {
+  e.preventDefault(); e.stopPropagation();
+  if (G.state === 'play') touch.dashQ = 0.3;
+}, { passive: false });
+$('btnSpec').addEventListener('touchstart', e => {
+  e.preventDefault(); e.stopPropagation();
+  if (G.state === 'play') useSpecial();
+}, { passive: false });
+$('btnPause').addEventListener('touchstart', e => {
+  e.preventDefault(); e.stopPropagation();
+  if (G.state === 'play') setStateUI('pause');
+}, { passive: false });
+
 /* ============================== UI HELPERS ============================== */
 const LAYERS = ['menu', 'select', 'shop', 'levelup', 'pause', 'over'];
 function setStateUI(st) {
   G.state = st;
   for (const l of LAYERS) $(l).classList.toggle('hidden', l !== st);
   $('hud').classList.toggle('hidden', !(st === 'play' || st === 'levelup' || st === 'pause'));
+  $('touchUI').classList.toggle('hidden', !(isTouch && st === 'play'));
+  if (st !== 'play' && typeof joyHide === 'function') joyHide();
 }
 function banner(txt) {
   const b = $('banner');
@@ -1090,12 +1177,19 @@ function updatePlay(dt) {
   /* ----- player movement ----- */
   let mx = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0);
   let mz = (keys.KeyS || keys.ArrowDown ? 1 : 0) - (keys.KeyW || keys.ArrowUp ? 1 : 0);
-  const moving = mx !== 0 || mz !== 0;
-  if (moving) { const l = Math.hypot(mx, mz); mx /= l; mz /= l; P.dir.set(mx, 0, mz); }
+  if (touch.id !== null && Math.hypot(touch.vx, touch.vz) > 0.12) { mx = touch.vx; mz = touch.vz; }
+  const moving = Math.hypot(mx, mz) > 0.01;
+  if (moving) {
+    const l = Math.hypot(mx, mz);
+    if (l > 1) { mx /= l; mz /= l; }
+    P.dir.set(mx, 0, mz).normalize();
+  }
 
   // dash
   P.dashCd -= dt;
-  if ((keys.ShiftLeft || keys.ShiftRight) && P.dashCd <= 0 && moving) {
+  touch.dashQ = Math.max(0, touch.dashQ - dt);
+  if ((keys.ShiftLeft || keys.ShiftRight || touch.dashQ > 0) && P.dashCd <= 0 && moving) {
+    touch.dashQ = 0;
     P.dashT = 0.18; P.dashCd = 1.4; P.iframes = Math.max(P.iframes, 0.35);
     SFX.dash(); fxRing(P.pos, 0xaaddff, 2.5, 0.3);
   }
@@ -1339,6 +1433,7 @@ function updateHud() {
   $('enFill').style.width = clamp(P.energy / P.energyMax * 100, 0, 100) + '%';
   $('hpText').textContent = Math.ceil(P.hp) + ' / ' + Math.ceil(P.hpMax) + (P.energy >= P.energyMax ? '  —  SPECIAL PRONTA! [SPAZIO]' : '');
   $('dashIco').classList.toggle('ready', P.dashCd <= 0);
+  $('btnSpec').classList.toggle('charged', P.energy >= P.energyMax);
   const mins = Math.floor(G.time / 60), secs = Math.floor(G.time % 60);
   $('waveTime').textContent = `Ondata ${G.wave}  •  ${mins}:${String(secs).padStart(2, '0')}`;
   $('island').textContent = bio.to.name;
