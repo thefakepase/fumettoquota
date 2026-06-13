@@ -119,6 +119,10 @@
 
   #muteBtn { position:fixed; bottom:14px; right:16px; z-index:20; font-size:22px; cursor:pointer; opacity:.7; }
   #muteBtn:hover { opacity:1; }
+  #qualBtn { position:fixed; bottom:14px; left:16px; z-index:20; font-size:14px; font-weight:800; cursor:pointer; opacity:.78;
+    background:linear-gradient(180deg, rgba(13,34,58,.85), rgba(7,18,33,.9)); border:2px solid #d8a73c; color:#ffe9a8;
+    padding:5px 12px; border-radius:10px; }
+  #qualBtn:hover { opacity:1; }
 
   /* ---------- touch controls ---------- */
   #touchUI { position:fixed; inset:0; z-index:9; pointer-events:none; }
@@ -282,6 +286,7 @@
 </div>
 
 <div id="muteBtn" title="Audio (M)">🔊</div>
+<div id="qualBtn" title="Qualità grafica">◆ Ultra</div>
 
 <!-- LOADING / ERROR -->
 <div id="loading" style="position:fixed;inset:0;z-index:50;background:#06121f;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;">
@@ -1355,6 +1360,1405 @@ window.addEventListener('error', function (e) {
 	UnrealBloomPass.BlurDirectionY = new THREE.Vector2( 0.0, 1.0 );
 
 	THREE.UnrealBloomPass = UnrealBloomPass;
+
+} )();
+
+</script>
+<script>
+/* SSAO + FXAA r144 */
+( function () {
+
+	// Ported from Stefan Gustavson's java implementation
+	// http://staffwww.itn.liu.se/~stegu/simplexnoise/simplexnoise.pdf
+	// Read Stefan's excellent paper for details on how this code works.
+	//
+	// Sean McCullough banksean@gmail.com
+	//
+	// Added 4D noise
+
+	/**
+ * You can pass in a random number generator object if you like.
+ * It is assumed to have a random() method.
+ */
+	class SimplexNoise {
+
+		constructor( r = Math ) {
+
+			this.grad3 = [[ 1, 1, 0 ], [ - 1, 1, 0 ], [ 1, - 1, 0 ], [ - 1, - 1, 0 ], [ 1, 0, 1 ], [ - 1, 0, 1 ], [ 1, 0, - 1 ], [ - 1, 0, - 1 ], [ 0, 1, 1 ], [ 0, - 1, 1 ], [ 0, 1, - 1 ], [ 0, - 1, - 1 ]];
+			this.grad4 = [[ 0, 1, 1, 1 ], [ 0, 1, 1, - 1 ], [ 0, 1, - 1, 1 ], [ 0, 1, - 1, - 1 ], [ 0, - 1, 1, 1 ], [ 0, - 1, 1, - 1 ], [ 0, - 1, - 1, 1 ], [ 0, - 1, - 1, - 1 ], [ 1, 0, 1, 1 ], [ 1, 0, 1, - 1 ], [ 1, 0, - 1, 1 ], [ 1, 0, - 1, - 1 ], [ - 1, 0, 1, 1 ], [ - 1, 0, 1, - 1 ], [ - 1, 0, - 1, 1 ], [ - 1, 0, - 1, - 1 ], [ 1, 1, 0, 1 ], [ 1, 1, 0, - 1 ], [ 1, - 1, 0, 1 ], [ 1, - 1, 0, - 1 ], [ - 1, 1, 0, 1 ], [ - 1, 1, 0, - 1 ], [ - 1, - 1, 0, 1 ], [ - 1, - 1, 0, - 1 ], [ 1, 1, 1, 0 ], [ 1, 1, - 1, 0 ], [ 1, - 1, 1, 0 ], [ 1, - 1, - 1, 0 ], [ - 1, 1, 1, 0 ], [ - 1, 1, - 1, 0 ], [ - 1, - 1, 1, 0 ], [ - 1, - 1, - 1, 0 ]];
+			this.p = [];
+
+			for ( let i = 0; i < 256; i ++ ) {
+
+				this.p[ i ] = Math.floor( r.random() * 256 );
+
+			} // To remove the need for index wrapping, double the permutation table length
+
+
+			this.perm = [];
+
+			for ( let i = 0; i < 512; i ++ ) {
+
+				this.perm[ i ] = this.p[ i & 255 ];
+
+			} // A lookup table to traverse the simplex around a given point in 4D.
+			// Details can be found where this table is used, in the 4D noise method.
+
+
+			this.simplex = [[ 0, 1, 2, 3 ], [ 0, 1, 3, 2 ], [ 0, 0, 0, 0 ], [ 0, 2, 3, 1 ], [ 0, 0, 0, 0 ], [ 0, 0, 0, 0 ], [ 0, 0, 0, 0 ], [ 1, 2, 3, 0 ], [ 0, 2, 1, 3 ], [ 0, 0, 0, 0 ], [ 0, 3, 1, 2 ], [ 0, 3, 2, 1 ], [ 0, 0, 0, 0 ], [ 0, 0, 0, 0 ], [ 0, 0, 0, 0 ], [ 1, 3, 2, 0 ], [ 0, 0, 0, 0 ], [ 0, 0, 0, 0 ], [ 0, 0, 0, 0 ], [ 0, 0, 0, 0 ], [ 0, 0, 0, 0 ], [ 0, 0, 0, 0 ], [ 0, 0, 0, 0 ], [ 0, 0, 0, 0 ], [ 1, 2, 0, 3 ], [ 0, 0, 0, 0 ], [ 1, 3, 0, 2 ], [ 0, 0, 0, 0 ], [ 0, 0, 0, 0 ], [ 0, 0, 0, 0 ], [ 2, 3, 0, 1 ], [ 2, 3, 1, 0 ], [ 1, 0, 2, 3 ], [ 1, 0, 3, 2 ], [ 0, 0, 0, 0 ], [ 0, 0, 0, 0 ], [ 0, 0, 0, 0 ], [ 2, 0, 3, 1 ], [ 0, 0, 0, 0 ], [ 2, 1, 3, 0 ], [ 0, 0, 0, 0 ], [ 0, 0, 0, 0 ], [ 0, 0, 0, 0 ], [ 0, 0, 0, 0 ], [ 0, 0, 0, 0 ], [ 0, 0, 0, 0 ], [ 0, 0, 0, 0 ], [ 0, 0, 0, 0 ], [ 2, 0, 1, 3 ], [ 0, 0, 0, 0 ], [ 0, 0, 0, 0 ], [ 0, 0, 0, 0 ], [ 3, 0, 1, 2 ], [ 3, 0, 2, 1 ], [ 0, 0, 0, 0 ], [ 3, 1, 2, 0 ], [ 2, 1, 0, 3 ], [ 0, 0, 0, 0 ], [ 0, 0, 0, 0 ], [ 0, 0, 0, 0 ], [ 3, 1, 0, 2 ], [ 0, 0, 0, 0 ], [ 3, 2, 0, 1 ], [ 3, 2, 1, 0 ]];
+
+		}
+
+		dot( g, x, y ) {
+
+			return g[ 0 ] * x + g[ 1 ] * y;
+
+		}
+
+		dot3( g, x, y, z ) {
+
+			return g[ 0 ] * x + g[ 1 ] * y + g[ 2 ] * z;
+
+		}
+
+		dot4( g, x, y, z, w ) {
+
+			return g[ 0 ] * x + g[ 1 ] * y + g[ 2 ] * z + g[ 3 ] * w;
+
+		}
+
+		noise( xin, yin ) {
+
+			let n0; // Noise contributions from the three corners
+
+			let n1;
+			let n2; // Skew the input space to determine which simplex cell we're in
+
+			const F2 = 0.5 * ( Math.sqrt( 3.0 ) - 1.0 );
+			const s = ( xin + yin ) * F2; // Hairy factor for 2D
+
+			const i = Math.floor( xin + s );
+			const j = Math.floor( yin + s );
+			const G2 = ( 3.0 - Math.sqrt( 3.0 ) ) / 6.0;
+			const t = ( i + j ) * G2;
+			const X0 = i - t; // Unskew the cell origin back to (x,y) space
+
+			const Y0 = j - t;
+			const x0 = xin - X0; // The x,y distances from the cell origin
+
+			const y0 = yin - Y0; // For the 2D case, the simplex shape is an equilateral triangle.
+			// Determine which simplex we are in.
+
+			let i1; // Offsets for second (middle) corner of simplex in (i,j) coords
+
+			let j1;
+
+			if ( x0 > y0 ) {
+
+				i1 = 1;
+				j1 = 0; // lower triangle, XY order: (0,0)->(1,0)->(1,1)
+
+			} else {
+
+				i1 = 0;
+				j1 = 1;
+
+			} // upper triangle, YX order: (0,0)->(0,1)->(1,1)
+			// A step of (1,0) in (i,j) means a step of (1-c,-c) in (x,y), and
+			// a step of (0,1) in (i,j) means a step of (-c,1-c) in (x,y), where
+			// c = (3-sqrt(3))/6
+
+
+			const x1 = x0 - i1 + G2; // Offsets for middle corner in (x,y) unskewed coords
+
+			const y1 = y0 - j1 + G2;
+			const x2 = x0 - 1.0 + 2.0 * G2; // Offsets for last corner in (x,y) unskewed coords
+
+			const y2 = y0 - 1.0 + 2.0 * G2; // Work out the hashed gradient indices of the three simplex corners
+
+			const ii = i & 255;
+			const jj = j & 255;
+			const gi0 = this.perm[ ii + this.perm[ jj ] ] % 12;
+			const gi1 = this.perm[ ii + i1 + this.perm[ jj + j1 ] ] % 12;
+			const gi2 = this.perm[ ii + 1 + this.perm[ jj + 1 ] ] % 12; // Calculate the contribution from the three corners
+
+			let t0 = 0.5 - x0 * x0 - y0 * y0;
+			if ( t0 < 0 ) n0 = 0.0; else {
+
+				t0 *= t0;
+				n0 = t0 * t0 * this.dot( this.grad3[ gi0 ], x0, y0 ); // (x,y) of grad3 used for 2D gradient
+
+			}
+
+			let t1 = 0.5 - x1 * x1 - y1 * y1;
+			if ( t1 < 0 ) n1 = 0.0; else {
+
+				t1 *= t1;
+				n1 = t1 * t1 * this.dot( this.grad3[ gi1 ], x1, y1 );
+
+			}
+
+			let t2 = 0.5 - x2 * x2 - y2 * y2;
+			if ( t2 < 0 ) n2 = 0.0; else {
+
+				t2 *= t2;
+				n2 = t2 * t2 * this.dot( this.grad3[ gi2 ], x2, y2 );
+
+			} // Add contributions from each corner to get the final noise value.
+			// The result is scaled to return values in the interval [-1,1].
+
+			return 70.0 * ( n0 + n1 + n2 );
+
+		} // 3D simplex noise
+
+
+		noise3d( xin, yin, zin ) {
+
+			let n0; // Noise contributions from the four corners
+
+			let n1;
+			let n2;
+			let n3; // Skew the input space to determine which simplex cell we're in
+
+			const F3 = 1.0 / 3.0;
+			const s = ( xin + yin + zin ) * F3; // Very nice and simple skew factor for 3D
+
+			const i = Math.floor( xin + s );
+			const j = Math.floor( yin + s );
+			const k = Math.floor( zin + s );
+			const G3 = 1.0 / 6.0; // Very nice and simple unskew factor, too
+
+			const t = ( i + j + k ) * G3;
+			const X0 = i - t; // Unskew the cell origin back to (x,y,z) space
+
+			const Y0 = j - t;
+			const Z0 = k - t;
+			const x0 = xin - X0; // The x,y,z distances from the cell origin
+
+			const y0 = yin - Y0;
+			const z0 = zin - Z0; // For the 3D case, the simplex shape is a slightly irregular tetrahedron.
+			// Determine which simplex we are in.
+
+			let i1; // Offsets for second corner of simplex in (i,j,k) coords
+
+			let j1;
+			let k1;
+			let i2; // Offsets for third corner of simplex in (i,j,k) coords
+
+			let j2;
+			let k2;
+
+			if ( x0 >= y0 ) {
+
+				if ( y0 >= z0 ) {
+
+					i1 = 1;
+					j1 = 0;
+					k1 = 0;
+					i2 = 1;
+					j2 = 1;
+					k2 = 0; // X Y Z order
+
+				} else if ( x0 >= z0 ) {
+
+					i1 = 1;
+					j1 = 0;
+					k1 = 0;
+					i2 = 1;
+					j2 = 0;
+					k2 = 1; // X Z Y order
+
+				} else {
+
+					i1 = 0;
+					j1 = 0;
+					k1 = 1;
+					i2 = 1;
+					j2 = 0;
+					k2 = 1;
+
+				} // Z X Y order
+
+			} else {
+
+				// x0<y0
+				if ( y0 < z0 ) {
+
+					i1 = 0;
+					j1 = 0;
+					k1 = 1;
+					i2 = 0;
+					j2 = 1;
+					k2 = 1; // Z Y X order
+
+				} else if ( x0 < z0 ) {
+
+					i1 = 0;
+					j1 = 1;
+					k1 = 0;
+					i2 = 0;
+					j2 = 1;
+					k2 = 1; // Y Z X order
+
+				} else {
+
+					i1 = 0;
+					j1 = 1;
+					k1 = 0;
+					i2 = 1;
+					j2 = 1;
+					k2 = 0;
+
+				} // Y X Z order
+
+			} // A step of (1,0,0) in (i,j,k) means a step of (1-c,-c,-c) in (x,y,z),
+			// a step of (0,1,0) in (i,j,k) means a step of (-c,1-c,-c) in (x,y,z), and
+			// a step of (0,0,1) in (i,j,k) means a step of (-c,-c,1-c) in (x,y,z), where
+			// c = 1/6.
+
+
+			const x1 = x0 - i1 + G3; // Offsets for second corner in (x,y,z) coords
+
+			const y1 = y0 - j1 + G3;
+			const z1 = z0 - k1 + G3;
+			const x2 = x0 - i2 + 2.0 * G3; // Offsets for third corner in (x,y,z) coords
+
+			const y2 = y0 - j2 + 2.0 * G3;
+			const z2 = z0 - k2 + 2.0 * G3;
+			const x3 = x0 - 1.0 + 3.0 * G3; // Offsets for last corner in (x,y,z) coords
+
+			const y3 = y0 - 1.0 + 3.0 * G3;
+			const z3 = z0 - 1.0 + 3.0 * G3; // Work out the hashed gradient indices of the four simplex corners
+
+			const ii = i & 255;
+			const jj = j & 255;
+			const kk = k & 255;
+			const gi0 = this.perm[ ii + this.perm[ jj + this.perm[ kk ] ] ] % 12;
+			const gi1 = this.perm[ ii + i1 + this.perm[ jj + j1 + this.perm[ kk + k1 ] ] ] % 12;
+			const gi2 = this.perm[ ii + i2 + this.perm[ jj + j2 + this.perm[ kk + k2 ] ] ] % 12;
+			const gi3 = this.perm[ ii + 1 + this.perm[ jj + 1 + this.perm[ kk + 1 ] ] ] % 12; // Calculate the contribution from the four corners
+
+			let t0 = 0.6 - x0 * x0 - y0 * y0 - z0 * z0;
+			if ( t0 < 0 ) n0 = 0.0; else {
+
+				t0 *= t0;
+				n0 = t0 * t0 * this.dot3( this.grad3[ gi0 ], x0, y0, z0 );
+
+			}
+
+			let t1 = 0.6 - x1 * x1 - y1 * y1 - z1 * z1;
+			if ( t1 < 0 ) n1 = 0.0; else {
+
+				t1 *= t1;
+				n1 = t1 * t1 * this.dot3( this.grad3[ gi1 ], x1, y1, z1 );
+
+			}
+
+			let t2 = 0.6 - x2 * x2 - y2 * y2 - z2 * z2;
+			if ( t2 < 0 ) n2 = 0.0; else {
+
+				t2 *= t2;
+				n2 = t2 * t2 * this.dot3( this.grad3[ gi2 ], x2, y2, z2 );
+
+			}
+
+			let t3 = 0.6 - x3 * x3 - y3 * y3 - z3 * z3;
+			if ( t3 < 0 ) n3 = 0.0; else {
+
+				t3 *= t3;
+				n3 = t3 * t3 * this.dot3( this.grad3[ gi3 ], x3, y3, z3 );
+
+			} // Add contributions from each corner to get the final noise value.
+			// The result is scaled to stay just inside [-1,1]
+
+			return 32.0 * ( n0 + n1 + n2 + n3 );
+
+		} // 4D simplex noise
+
+
+		noise4d( x, y, z, w ) {
+
+			// For faster and easier lookups
+			const grad4 = this.grad4;
+			const simplex = this.simplex;
+			const perm = this.perm; // The skewing and unskewing factors are hairy again for the 4D case
+
+			const F4 = ( Math.sqrt( 5.0 ) - 1.0 ) / 4.0;
+			const G4 = ( 5.0 - Math.sqrt( 5.0 ) ) / 20.0;
+			let n0; // Noise contributions from the five corners
+
+			let n1;
+			let n2;
+			let n3;
+			let n4; // Skew the (x,y,z,w) space to determine which cell of 24 simplices we're in
+
+			const s = ( x + y + z + w ) * F4; // Factor for 4D skewing
+
+			const i = Math.floor( x + s );
+			const j = Math.floor( y + s );
+			const k = Math.floor( z + s );
+			const l = Math.floor( w + s );
+			const t = ( i + j + k + l ) * G4; // Factor for 4D unskewing
+
+			const X0 = i - t; // Unskew the cell origin back to (x,y,z,w) space
+
+			const Y0 = j - t;
+			const Z0 = k - t;
+			const W0 = l - t;
+			const x0 = x - X0; // The x,y,z,w distances from the cell origin
+
+			const y0 = y - Y0;
+			const z0 = z - Z0;
+			const w0 = w - W0; // For the 4D case, the simplex is a 4D shape I won't even try to describe.
+			// To find out which of the 24 possible simplices we're in, we need to
+			// determine the magnitude ordering of x0, y0, z0 and w0.
+			// The method below is a good way of finding the ordering of x,y,z,w and
+			// then find the correct traversal order for the simplex we’re in.
+			// First, six pair-wise comparisons are performed between each possible pair
+			// of the four coordinates, and the results are used to add up binary bits
+			// for an integer index.
+
+			const c1 = x0 > y0 ? 32 : 0;
+			const c2 = x0 > z0 ? 16 : 0;
+			const c3 = y0 > z0 ? 8 : 0;
+			const c4 = x0 > w0 ? 4 : 0;
+			const c5 = y0 > w0 ? 2 : 0;
+			const c6 = z0 > w0 ? 1 : 0;
+			const c = c1 + c2 + c3 + c4 + c5 + c6; // simplex[c] is a 4-vector with the numbers 0, 1, 2 and 3 in some order.
+			// Many values of c will never occur, since e.g. x>y>z>w makes x<z, y<w and x<w
+			// impossible. Only the 24 indices which have non-zero entries make any sense.
+			// We use a thresholding to set the coordinates in turn from the largest magnitude.
+			// The number 3 in the "simplex" array is at the position of the largest coordinate.
+
+			const i1 = simplex[ c ][ 0 ] >= 3 ? 1 : 0;
+			const j1 = simplex[ c ][ 1 ] >= 3 ? 1 : 0;
+			const k1 = simplex[ c ][ 2 ] >= 3 ? 1 : 0;
+			const l1 = simplex[ c ][ 3 ] >= 3 ? 1 : 0; // The number 2 in the "simplex" array is at the second largest coordinate.
+
+			const i2 = simplex[ c ][ 0 ] >= 2 ? 1 : 0;
+			const j2 = simplex[ c ][ 1 ] >= 2 ? 1 : 0;
+			const k2 = simplex[ c ][ 2 ] >= 2 ? 1 : 0;
+			const l2 = simplex[ c ][ 3 ] >= 2 ? 1 : 0; // The number 1 in the "simplex" array is at the second smallest coordinate.
+
+			const i3 = simplex[ c ][ 0 ] >= 1 ? 1 : 0;
+			const j3 = simplex[ c ][ 1 ] >= 1 ? 1 : 0;
+			const k3 = simplex[ c ][ 2 ] >= 1 ? 1 : 0;
+			const l3 = simplex[ c ][ 3 ] >= 1 ? 1 : 0; // The fifth corner has all coordinate offsets = 1, so no need to look that up.
+
+			const x1 = x0 - i1 + G4; // Offsets for second corner in (x,y,z,w) coords
+
+			const y1 = y0 - j1 + G4;
+			const z1 = z0 - k1 + G4;
+			const w1 = w0 - l1 + G4;
+			const x2 = x0 - i2 + 2.0 * G4; // Offsets for third corner in (x,y,z,w) coords
+
+			const y2 = y0 - j2 + 2.0 * G4;
+			const z2 = z0 - k2 + 2.0 * G4;
+			const w2 = w0 - l2 + 2.0 * G4;
+			const x3 = x0 - i3 + 3.0 * G4; // Offsets for fourth corner in (x,y,z,w) coords
+
+			const y3 = y0 - j3 + 3.0 * G4;
+			const z3 = z0 - k3 + 3.0 * G4;
+			const w3 = w0 - l3 + 3.0 * G4;
+			const x4 = x0 - 1.0 + 4.0 * G4; // Offsets for last corner in (x,y,z,w) coords
+
+			const y4 = y0 - 1.0 + 4.0 * G4;
+			const z4 = z0 - 1.0 + 4.0 * G4;
+			const w4 = w0 - 1.0 + 4.0 * G4; // Work out the hashed gradient indices of the five simplex corners
+
+			const ii = i & 255;
+			const jj = j & 255;
+			const kk = k & 255;
+			const ll = l & 255;
+			const gi0 = perm[ ii + perm[ jj + perm[ kk + perm[ ll ] ] ] ] % 32;
+			const gi1 = perm[ ii + i1 + perm[ jj + j1 + perm[ kk + k1 + perm[ ll + l1 ] ] ] ] % 32;
+			const gi2 = perm[ ii + i2 + perm[ jj + j2 + perm[ kk + k2 + perm[ ll + l2 ] ] ] ] % 32;
+			const gi3 = perm[ ii + i3 + perm[ jj + j3 + perm[ kk + k3 + perm[ ll + l3 ] ] ] ] % 32;
+			const gi4 = perm[ ii + 1 + perm[ jj + 1 + perm[ kk + 1 + perm[ ll + 1 ] ] ] ] % 32; // Calculate the contribution from the five corners
+
+			let t0 = 0.6 - x0 * x0 - y0 * y0 - z0 * z0 - w0 * w0;
+			if ( t0 < 0 ) n0 = 0.0; else {
+
+				t0 *= t0;
+				n0 = t0 * t0 * this.dot4( grad4[ gi0 ], x0, y0, z0, w0 );
+
+			}
+
+			let t1 = 0.6 - x1 * x1 - y1 * y1 - z1 * z1 - w1 * w1;
+			if ( t1 < 0 ) n1 = 0.0; else {
+
+				t1 *= t1;
+				n1 = t1 * t1 * this.dot4( grad4[ gi1 ], x1, y1, z1, w1 );
+
+			}
+
+			let t2 = 0.6 - x2 * x2 - y2 * y2 - z2 * z2 - w2 * w2;
+			if ( t2 < 0 ) n2 = 0.0; else {
+
+				t2 *= t2;
+				n2 = t2 * t2 * this.dot4( grad4[ gi2 ], x2, y2, z2, w2 );
+
+			}
+
+			let t3 = 0.6 - x3 * x3 - y3 * y3 - z3 * z3 - w3 * w3;
+			if ( t3 < 0 ) n3 = 0.0; else {
+
+				t3 *= t3;
+				n3 = t3 * t3 * this.dot4( grad4[ gi3 ], x3, y3, z3, w3 );
+
+			}
+
+			let t4 = 0.6 - x4 * x4 - y4 * y4 - z4 * z4 - w4 * w4;
+			if ( t4 < 0 ) n4 = 0.0; else {
+
+				t4 *= t4;
+				n4 = t4 * t4 * this.dot4( grad4[ gi4 ], x4, y4, z4, w4 );
+
+			} // Sum up and scale the result to cover the range [-1,1]
+
+			return 27.0 * ( n0 + n1 + n2 + n3 + n4 );
+
+		}
+
+	}
+
+	THREE.SimplexNoise = SimplexNoise;
+
+} )();
+( function () {
+
+	/**
+ * References:
+ * http://john-chapman-graphics.blogspot.com/2013/01/ssao-tutorial.html
+ * https://learnopengl.com/Advanced-Lighting/SSAO
+ * https://github.com/McNopper/OpenGL/blob/master/Example28/shader/ssao.frag.glsl
+ */
+
+	const SSAOShader = {
+		defines: {
+			'PERSPECTIVE_CAMERA': 1,
+			'KERNEL_SIZE': 32
+		},
+		uniforms: {
+			'tDiffuse': {
+				value: null
+			},
+			'tNormal': {
+				value: null
+			},
+			'tDepth': {
+				value: null
+			},
+			'tNoise': {
+				value: null
+			},
+			'kernel': {
+				value: null
+			},
+			'cameraNear': {
+				value: null
+			},
+			'cameraFar': {
+				value: null
+			},
+			'resolution': {
+				value: new THREE.Vector2()
+			},
+			'cameraProjectionMatrix': {
+				value: new THREE.Matrix4()
+			},
+			'cameraInverseProjectionMatrix': {
+				value: new THREE.Matrix4()
+			},
+			'kernelRadius': {
+				value: 8
+			},
+			'minDistance': {
+				value: 0.005
+			},
+			'maxDistance': {
+				value: 0.05
+			}
+		},
+		vertexShader:
+  /* glsl */
+  `
+
+		varying vec2 vUv;
+
+		void main() {
+
+			vUv = uv;
+
+			gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+
+		}`,
+		fragmentShader:
+  /* glsl */
+  `
+
+		uniform sampler2D tDiffuse;
+		uniform sampler2D tNormal;
+		uniform sampler2D tDepth;
+		uniform sampler2D tNoise;
+
+		uniform vec3 kernel[ KERNEL_SIZE ];
+
+		uniform vec2 resolution;
+
+		uniform float cameraNear;
+		uniform float cameraFar;
+		uniform mat4 cameraProjectionMatrix;
+		uniform mat4 cameraInverseProjectionMatrix;
+
+		uniform float kernelRadius;
+		uniform float minDistance; // avoid artifacts caused by neighbour fragments with minimal depth difference
+		uniform float maxDistance; // avoid the influence of fragments which are too far away
+
+		varying vec2 vUv;
+
+		#include <packing>
+
+		float getDepth( const in vec2 screenPosition ) {
+
+			return texture2D( tDepth, screenPosition ).x;
+
+		}
+
+		float getLinearDepth( const in vec2 screenPosition ) {
+
+			#if PERSPECTIVE_CAMERA == 1
+
+				float fragCoordZ = texture2D( tDepth, screenPosition ).x;
+				float viewZ = perspectiveDepthToViewZ( fragCoordZ, cameraNear, cameraFar );
+				return viewZToOrthographicDepth( viewZ, cameraNear, cameraFar );
+
+			#else
+
+				return texture2D( tDepth, screenPosition ).x;
+
+			#endif
+
+		}
+
+		float getViewZ( const in float depth ) {
+
+			#if PERSPECTIVE_CAMERA == 1
+
+				return perspectiveDepthToViewZ( depth, cameraNear, cameraFar );
+
+			#else
+
+				return orthographicDepthToViewZ( depth, cameraNear, cameraFar );
+
+			#endif
+
+		}
+
+		vec3 getViewPosition( const in vec2 screenPosition, const in float depth, const in float viewZ ) {
+
+			float clipW = cameraProjectionMatrix[2][3] * viewZ + cameraProjectionMatrix[3][3];
+
+			vec4 clipPosition = vec4( ( vec3( screenPosition, depth ) - 0.5 ) * 2.0, 1.0 );
+
+			clipPosition *= clipW; // unprojection.
+
+			return ( cameraInverseProjectionMatrix * clipPosition ).xyz;
+
+		}
+
+		vec3 getViewNormal( const in vec2 screenPosition ) {
+
+			return unpackRGBToNormal( texture2D( tNormal, screenPosition ).xyz );
+
+		}
+
+		void main() {
+
+			float depth = getDepth( vUv );
+			float viewZ = getViewZ( depth );
+
+			vec3 viewPosition = getViewPosition( vUv, depth, viewZ );
+			vec3 viewNormal = getViewNormal( vUv );
+
+			vec2 noiseScale = vec2( resolution.x / 4.0, resolution.y / 4.0 );
+			vec3 random = vec3( texture2D( tNoise, vUv * noiseScale ).r );
+
+			// compute matrix used to reorient a kernel vector
+
+			vec3 tangent = normalize( random - viewNormal * dot( random, viewNormal ) );
+			vec3 bitangent = cross( viewNormal, tangent );
+			mat3 kernelMatrix = mat3( tangent, bitangent, viewNormal );
+
+		 float occlusion = 0.0;
+
+		 for ( int i = 0; i < KERNEL_SIZE; i ++ ) {
+
+				vec3 sampleVector = kernelMatrix * kernel[ i ]; // reorient sample vector in view space
+				vec3 samplePoint = viewPosition + ( sampleVector * kernelRadius ); // calculate sample point
+
+				vec4 samplePointNDC = cameraProjectionMatrix * vec4( samplePoint, 1.0 ); // project point and calculate NDC
+				samplePointNDC /= samplePointNDC.w;
+
+				vec2 samplePointUv = samplePointNDC.xy * 0.5 + 0.5; // compute uv coordinates
+
+				float realDepth = getLinearDepth( samplePointUv ); // get linear depth from depth texture
+				float sampleDepth = viewZToOrthographicDepth( samplePoint.z, cameraNear, cameraFar ); // compute linear depth of the sample view Z value
+				float delta = sampleDepth - realDepth;
+
+				if ( delta > minDistance && delta < maxDistance ) { // if fragment is before sample point, increase occlusion
+
+					occlusion += 1.0;
+
+				}
+
+			}
+
+			occlusion = clamp( occlusion / float( KERNEL_SIZE ), 0.0, 1.0 );
+
+			gl_FragColor = vec4( vec3( 1.0 - occlusion ), 1.0 );
+
+		}`
+	};
+	const SSAODepthShader = {
+		defines: {
+			'PERSPECTIVE_CAMERA': 1
+		},
+		uniforms: {
+			'tDepth': {
+				value: null
+			},
+			'cameraNear': {
+				value: null
+			},
+			'cameraFar': {
+				value: null
+			}
+		},
+		vertexShader: `varying vec2 vUv;
+
+		void main() {
+
+			vUv = uv;
+			gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+
+		}`,
+		fragmentShader: `uniform sampler2D tDepth;
+
+		uniform float cameraNear;
+		uniform float cameraFar;
+
+		varying vec2 vUv;
+
+		#include <packing>
+
+		float getLinearDepth( const in vec2 screenPosition ) {
+
+			#if PERSPECTIVE_CAMERA == 1
+
+				float fragCoordZ = texture2D( tDepth, screenPosition ).x;
+				float viewZ = perspectiveDepthToViewZ( fragCoordZ, cameraNear, cameraFar );
+				return viewZToOrthographicDepth( viewZ, cameraNear, cameraFar );
+
+			#else
+
+				return texture2D( tDepth, screenPosition ).x;
+
+			#endif
+
+		}
+
+		void main() {
+
+			float depth = getLinearDepth( vUv );
+			gl_FragColor = vec4( vec3( 1.0 - depth ), 1.0 );
+
+		}`
+	};
+	const SSAOBlurShader = {
+		uniforms: {
+			'tDiffuse': {
+				value: null
+			},
+			'resolution': {
+				value: new THREE.Vector2()
+			}
+		},
+		vertexShader: `varying vec2 vUv;
+
+		void main() {
+
+			vUv = uv;
+			gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+
+		}`,
+		fragmentShader: `uniform sampler2D tDiffuse;
+
+		uniform vec2 resolution;
+
+		varying vec2 vUv;
+
+		void main() {
+
+			vec2 texelSize = ( 1.0 / resolution );
+			float result = 0.0;
+
+			for ( int i = - 2; i <= 2; i ++ ) {
+
+				for ( int j = - 2; j <= 2; j ++ ) {
+
+					vec2 offset = ( vec2( float( i ), float( j ) ) ) * texelSize;
+					result += texture2D( tDiffuse, vUv + offset ).r;
+
+				}
+
+			}
+
+			gl_FragColor = vec4( vec3( result / ( 5.0 * 5.0 ) ), 1.0 );
+
+		}`
+	};
+
+	THREE.SSAOBlurShader = SSAOBlurShader;
+	THREE.SSAODepthShader = SSAODepthShader;
+	THREE.SSAOShader = SSAOShader;
+
+} )();
+( function () {
+
+	/**
+ * NVIDIA FXAA by Timothy Lottes
+ * https://developer.download.nvidia.com/assets/gamedev/files/sdk/11/FXAA_WhitePaper.pdf
+ * - WebGL port by @supereggbert
+ * http://www.glge.org/demos/fxaa/
+ * Further improved by Daniel Sturk
+ */
+
+	const FXAAShader = {
+		uniforms: {
+			'tDiffuse': {
+				value: null
+			},
+			'resolution': {
+				value: new THREE.Vector2( 1 / 1024, 1 / 512 )
+			}
+		},
+		vertexShader:
+  /* glsl */
+  `
+
+		varying vec2 vUv;
+
+		void main() {
+
+			vUv = uv;
+			gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+
+		}`,
+		fragmentShader: `
+	precision highp float;
+
+	uniform sampler2D tDiffuse;
+
+	uniform vec2 resolution;
+
+	varying vec2 vUv;
+
+	// FXAA 3.11 implementation by NVIDIA, ported to WebGL by Agost Biro (biro@archilogic.com)
+
+	//----------------------------------------------------------------------------------
+	// File:        es3-kepler\FXAA\assets\shaders/FXAA_DefaultES.frag
+	// SDK Version: v3.00
+	// Email:       gameworks@nvidia.com
+	// Site:        http://developer.nvidia.com/
+	//
+	// Copyright (c) 2014-2015, NVIDIA CORPORATION. All rights reserved.
+	//
+	// Redistribution and use in source and binary forms, with or without
+	// modification, are permitted provided that the following conditions
+	// are met:
+	//  * Redistributions of source code must retain the above copyright
+	//    notice, this list of conditions and the following disclaimer.
+	//  * Redistributions in binary form must reproduce the above copyright
+	//    notice, this list of conditions and the following disclaimer in the
+	//    documentation and/or other materials provided with the distribution.
+	//  * Neither the name of NVIDIA CORPORATION nor the names of its
+	//    contributors may be used to endorse or promote products derived
+	//    from this software without specific prior written permission.
+	//
+	// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ''AS IS'' AND ANY
+	// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+	// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+	// PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+	// CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+	// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+	// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+	// PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+	// OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+	// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+	// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+	//
+	//----------------------------------------------------------------------------------
+
+	#ifndef FXAA_DISCARD
+			//
+			// Only valid for PC OpenGL currently.
+			// Probably will not work when FXAA_GREEN_AS_LUMA = 1.
+			//
+			// 1 = Use discard on pixels which don't need AA.
+			//     For APIs which enable concurrent TEX+ROP from same surface.
+			// 0 = Return unchanged color on pixels which don't need AA.
+			//
+			#define FXAA_DISCARD 0
+	#endif
+
+	/*--------------------------------------------------------------------------*/
+	#define FxaaTexTop(t, p) texture2D(t, p, -100.0)
+	#define FxaaTexOff(t, p, o, r) texture2D(t, p + (o * r), -100.0)
+	/*--------------------------------------------------------------------------*/
+
+	#define NUM_SAMPLES 5
+
+	// assumes colors have premultipliedAlpha, so that the calculated color contrast is scaled by alpha
+	float contrast( vec4 a, vec4 b ) {
+			vec4 diff = abs( a - b );
+			return max( max( max( diff.r, diff.g ), diff.b ), diff.a );
+	}
+
+	/*============================================================================
+
+									FXAA3 QUALITY - PC
+
+	============================================================================*/
+
+	/*--------------------------------------------------------------------------*/
+	vec4 FxaaPixelShader(
+			vec2 posM,
+			sampler2D tex,
+			vec2 fxaaQualityRcpFrame,
+			float fxaaQualityEdgeThreshold,
+			float fxaaQualityinvEdgeThreshold
+	) {
+			vec4 rgbaM = FxaaTexTop(tex, posM);
+			vec4 rgbaS = FxaaTexOff(tex, posM, vec2( 0.0, 1.0), fxaaQualityRcpFrame.xy);
+			vec4 rgbaE = FxaaTexOff(tex, posM, vec2( 1.0, 0.0), fxaaQualityRcpFrame.xy);
+			vec4 rgbaN = FxaaTexOff(tex, posM, vec2( 0.0,-1.0), fxaaQualityRcpFrame.xy);
+			vec4 rgbaW = FxaaTexOff(tex, posM, vec2(-1.0, 0.0), fxaaQualityRcpFrame.xy);
+			// . S .
+			// W M E
+			// . N .
+
+			bool earlyExit = max( max( max(
+					contrast( rgbaM, rgbaN ),
+					contrast( rgbaM, rgbaS ) ),
+					contrast( rgbaM, rgbaE ) ),
+					contrast( rgbaM, rgbaW ) )
+					< fxaaQualityEdgeThreshold;
+			// . 0 .
+			// 0 0 0
+			// . 0 .
+
+			#if (FXAA_DISCARD == 1)
+					if(earlyExit) FxaaDiscard;
+			#else
+					if(earlyExit) return rgbaM;
+			#endif
+
+			float contrastN = contrast( rgbaM, rgbaN );
+			float contrastS = contrast( rgbaM, rgbaS );
+			float contrastE = contrast( rgbaM, rgbaE );
+			float contrastW = contrast( rgbaM, rgbaW );
+
+			float relativeVContrast = ( contrastN + contrastS ) - ( contrastE + contrastW );
+			relativeVContrast *= fxaaQualityinvEdgeThreshold;
+
+			bool horzSpan = relativeVContrast > 0.;
+			// . 1 .
+			// 0 0 0
+			// . 1 .
+
+			// 45 deg edge detection and corners of objects, aka V/H contrast is too similar
+			if( abs( relativeVContrast ) < .3 ) {
+					// locate the edge
+					vec2 dirToEdge;
+					dirToEdge.x = contrastE > contrastW ? 1. : -1.;
+					dirToEdge.y = contrastS > contrastN ? 1. : -1.;
+					// . 2 .      . 1 .
+					// 1 0 2  ~=  0 0 1
+					// . 1 .      . 0 .
+
+					// tap 2 pixels and see which ones are "outside" the edge, to
+					// determine if the edge is vertical or horizontal
+
+					vec4 rgbaAlongH = FxaaTexOff(tex, posM, vec2( dirToEdge.x, -dirToEdge.y ), fxaaQualityRcpFrame.xy);
+					float matchAlongH = contrast( rgbaM, rgbaAlongH );
+					// . 1 .
+					// 0 0 1
+					// . 0 H
+
+					vec4 rgbaAlongV = FxaaTexOff(tex, posM, vec2( -dirToEdge.x, dirToEdge.y ), fxaaQualityRcpFrame.xy);
+					float matchAlongV = contrast( rgbaM, rgbaAlongV );
+					// V 1 .
+					// 0 0 1
+					// . 0 .
+
+					relativeVContrast = matchAlongV - matchAlongH;
+					relativeVContrast *= fxaaQualityinvEdgeThreshold;
+
+					if( abs( relativeVContrast ) < .3 ) { // 45 deg edge
+							// 1 1 .
+							// 0 0 1
+							// . 0 1
+
+							// do a simple blur
+							return mix(
+									rgbaM,
+									(rgbaN + rgbaS + rgbaE + rgbaW) * .25,
+									.4
+							);
+					}
+
+					horzSpan = relativeVContrast > 0.;
+			}
+
+			if(!horzSpan) rgbaN = rgbaW;
+			if(!horzSpan) rgbaS = rgbaE;
+			// . 0 .      1
+			// 1 0 1  ->  0
+			// . 0 .      1
+
+			bool pairN = contrast( rgbaM, rgbaN ) > contrast( rgbaM, rgbaS );
+			if(!pairN) rgbaN = rgbaS;
+
+			vec2 offNP;
+			offNP.x = (!horzSpan) ? 0.0 : fxaaQualityRcpFrame.x;
+			offNP.y = ( horzSpan) ? 0.0 : fxaaQualityRcpFrame.y;
+
+			bool doneN = false;
+			bool doneP = false;
+
+			float nDist = 0.;
+			float pDist = 0.;
+
+			vec2 posN = posM;
+			vec2 posP = posM;
+
+			int iterationsUsed = 0;
+			int iterationsUsedN = 0;
+			int iterationsUsedP = 0;
+			for( int i = 0; i < NUM_SAMPLES; i++ ) {
+					iterationsUsed = i;
+
+					float increment = float(i + 1);
+
+					if(!doneN) {
+							nDist += increment;
+							posN = posM + offNP * nDist;
+							vec4 rgbaEndN = FxaaTexTop(tex, posN.xy);
+							doneN = contrast( rgbaEndN, rgbaM ) > contrast( rgbaEndN, rgbaN );
+							iterationsUsedN = i;
+					}
+
+					if(!doneP) {
+							pDist += increment;
+							posP = posM - offNP * pDist;
+							vec4 rgbaEndP = FxaaTexTop(tex, posP.xy);
+							doneP = contrast( rgbaEndP, rgbaM ) > contrast( rgbaEndP, rgbaN );
+							iterationsUsedP = i;
+					}
+
+					if(doneN || doneP) break;
+			}
+
+
+			if ( !doneP && !doneN ) return rgbaM; // failed to find end of edge
+
+			float dist = min(
+					doneN ? float( iterationsUsedN ) / float( NUM_SAMPLES - 1 ) : 1.,
+					doneP ? float( iterationsUsedP ) / float( NUM_SAMPLES - 1 ) : 1.
+			);
+
+			// hacky way of reduces blurriness of mostly diagonal edges
+			// but reduces AA quality
+			dist = pow(dist, .5);
+
+			dist = 1. - dist;
+
+			return mix(
+					rgbaM,
+					rgbaN,
+					dist * .5
+			);
+	}
+
+	void main() {
+			const float edgeDetectionQuality = .2;
+			const float invEdgeDetectionQuality = 1. / edgeDetectionQuality;
+
+			gl_FragColor = FxaaPixelShader(
+					vUv,
+					tDiffuse,
+					resolution,
+					edgeDetectionQuality, // [0,1] contrast needed, otherwise early discard
+					invEdgeDetectionQuality
+			);
+
+	}
+	`
+	};
+
+	THREE.FXAAShader = FXAAShader;
+
+} )();
+( function () {
+
+	class SSAOPass extends THREE.Pass {
+
+		constructor( scene, camera, width, height ) {
+
+			super();
+			this.width = width !== undefined ? width : 512;
+			this.height = height !== undefined ? height : 512;
+			this.clear = true;
+			this.camera = camera;
+			this.scene = scene;
+			this.kernelRadius = 8;
+			this.kernelSize = 32;
+			this.kernel = [];
+			this.noiseTexture = null;
+			this.output = 0;
+			this.minDistance = 0.005;
+			this.maxDistance = 0.1;
+			this._visibilityCache = new Map(); //
+
+			this.generateSampleKernel();
+			this.generateRandomKernelRotations(); // beauty render target
+
+			const depthTexture = new THREE.DepthTexture();
+			depthTexture.format = THREE.DepthStencilFormat;
+			depthTexture.type = THREE.UnsignedInt248Type;
+			this.beautyRenderTarget = new THREE.WebGLRenderTarget( this.width, this.height ); // normal render target with depth buffer
+
+			this.normalRenderTarget = new THREE.WebGLRenderTarget( this.width, this.height, {
+				minFilter: THREE.NearestFilter,
+				magFilter: THREE.NearestFilter,
+				depthTexture: depthTexture
+			} ); // ssao render target
+
+			this.ssaoRenderTarget = new THREE.WebGLRenderTarget( this.width, this.height );
+			this.blurRenderTarget = this.ssaoRenderTarget.clone(); // ssao material
+
+			if ( THREE.SSAOShader === undefined ) {
+
+				console.error( 'THREE.SSAOPass: The pass relies on THREE.SSAOShader.' );
+
+			}
+
+			this.ssaoMaterial = new THREE.ShaderMaterial( {
+				defines: Object.assign( {}, THREE.SSAOShader.defines ),
+				uniforms: THREE.UniformsUtils.clone( THREE.SSAOShader.uniforms ),
+				vertexShader: THREE.SSAOShader.vertexShader,
+				fragmentShader: THREE.SSAOShader.fragmentShader,
+				blending: THREE.NoBlending
+			} );
+			this.ssaoMaterial.uniforms[ 'tDiffuse' ].value = this.beautyRenderTarget.texture;
+			this.ssaoMaterial.uniforms[ 'tNormal' ].value = this.normalRenderTarget.texture;
+			this.ssaoMaterial.uniforms[ 'tDepth' ].value = this.normalRenderTarget.depthTexture;
+			this.ssaoMaterial.uniforms[ 'tNoise' ].value = this.noiseTexture;
+			this.ssaoMaterial.uniforms[ 'kernel' ].value = this.kernel;
+			this.ssaoMaterial.uniforms[ 'cameraNear' ].value = this.camera.near;
+			this.ssaoMaterial.uniforms[ 'cameraFar' ].value = this.camera.far;
+			this.ssaoMaterial.uniforms[ 'resolution' ].value.set( this.width, this.height );
+			this.ssaoMaterial.uniforms[ 'cameraProjectionMatrix' ].value.copy( this.camera.projectionMatrix );
+			this.ssaoMaterial.uniforms[ 'cameraInverseProjectionMatrix' ].value.copy( this.camera.projectionMatrixInverse ); // normal material
+
+			this.normalMaterial = new THREE.MeshNormalMaterial();
+			this.normalMaterial.blending = THREE.NoBlending; // blur material
+
+			this.blurMaterial = new THREE.ShaderMaterial( {
+				defines: Object.assign( {}, THREE.SSAOBlurShader.defines ),
+				uniforms: THREE.UniformsUtils.clone( THREE.SSAOBlurShader.uniforms ),
+				vertexShader: THREE.SSAOBlurShader.vertexShader,
+				fragmentShader: THREE.SSAOBlurShader.fragmentShader
+			} );
+			this.blurMaterial.uniforms[ 'tDiffuse' ].value = this.ssaoRenderTarget.texture;
+			this.blurMaterial.uniforms[ 'resolution' ].value.set( this.width, this.height ); // material for rendering the depth
+
+			this.depthRenderMaterial = new THREE.ShaderMaterial( {
+				defines: Object.assign( {}, THREE.SSAODepthShader.defines ),
+				uniforms: THREE.UniformsUtils.clone( THREE.SSAODepthShader.uniforms ),
+				vertexShader: THREE.SSAODepthShader.vertexShader,
+				fragmentShader: THREE.SSAODepthShader.fragmentShader,
+				blending: THREE.NoBlending
+			} );
+			this.depthRenderMaterial.uniforms[ 'tDepth' ].value = this.normalRenderTarget.depthTexture;
+			this.depthRenderMaterial.uniforms[ 'cameraNear' ].value = this.camera.near;
+			this.depthRenderMaterial.uniforms[ 'cameraFar' ].value = this.camera.far; // material for rendering the content of a render target
+
+			this.copyMaterial = new THREE.ShaderMaterial( {
+				uniforms: THREE.UniformsUtils.clone( THREE.CopyShader.uniforms ),
+				vertexShader: THREE.CopyShader.vertexShader,
+				fragmentShader: THREE.CopyShader.fragmentShader,
+				transparent: true,
+				depthTest: false,
+				depthWrite: false,
+				blendSrc: THREE.DstColorFactor,
+				blendDst: THREE.ZeroFactor,
+				blendEquation: THREE.AddEquation,
+				blendSrcAlpha: THREE.DstAlphaFactor,
+				blendDstAlpha: THREE.ZeroFactor,
+				blendEquationAlpha: THREE.AddEquation
+			} );
+			this.fsQuad = new THREE.FullScreenQuad( null );
+			this.originalClearColor = new THREE.Color();
+
+		}
+
+		dispose() {
+
+			// dispose render targets
+			this.beautyRenderTarget.dispose();
+			this.normalRenderTarget.dispose();
+			this.ssaoRenderTarget.dispose();
+			this.blurRenderTarget.dispose(); // dispose materials
+
+			this.normalMaterial.dispose();
+			this.blurMaterial.dispose();
+			this.copyMaterial.dispose();
+			this.depthRenderMaterial.dispose(); // dipsose full screen quad
+
+			this.fsQuad.dispose();
+
+		}
+
+		render( renderer, writeBuffer
+			/*, readBuffer, deltaTime, maskActive */
+		) {
+
+			if ( renderer.capabilities.isWebGL2 === false ) this.noiseTexture.format = THREE.LuminanceFormat; // render beauty
+
+			renderer.setRenderTarget( this.beautyRenderTarget );
+			renderer.clear();
+			renderer.render( this.scene, this.camera ); // render normals and depth (honor only meshes, points and lines do not contribute to SSAO)
+
+			this.overrideVisibility();
+			this.renderOverride( renderer, this.normalMaterial, this.normalRenderTarget, 0x7777ff, 1.0 );
+			this.restoreVisibility(); // render SSAO
+
+			this.ssaoMaterial.uniforms[ 'kernelRadius' ].value = this.kernelRadius;
+			this.ssaoMaterial.uniforms[ 'minDistance' ].value = this.minDistance;
+			this.ssaoMaterial.uniforms[ 'maxDistance' ].value = this.maxDistance;
+			this.renderPass( renderer, this.ssaoMaterial, this.ssaoRenderTarget ); // render blur
+
+			this.renderPass( renderer, this.blurMaterial, this.blurRenderTarget ); // output result to screen
+
+			switch ( this.output ) {
+
+				case SSAOPass.OUTPUT.SSAO:
+					this.copyMaterial.uniforms[ 'tDiffuse' ].value = this.ssaoRenderTarget.texture;
+					this.copyMaterial.blending = THREE.NoBlending;
+					this.renderPass( renderer, this.copyMaterial, this.renderToScreen ? null : writeBuffer );
+					break;
+
+				case SSAOPass.OUTPUT.Blur:
+					this.copyMaterial.uniforms[ 'tDiffuse' ].value = this.blurRenderTarget.texture;
+					this.copyMaterial.blending = THREE.NoBlending;
+					this.renderPass( renderer, this.copyMaterial, this.renderToScreen ? null : writeBuffer );
+					break;
+
+				case SSAOPass.OUTPUT.Beauty:
+					this.copyMaterial.uniforms[ 'tDiffuse' ].value = this.beautyRenderTarget.texture;
+					this.copyMaterial.blending = THREE.NoBlending;
+					this.renderPass( renderer, this.copyMaterial, this.renderToScreen ? null : writeBuffer );
+					break;
+
+				case SSAOPass.OUTPUT.Depth:
+					this.renderPass( renderer, this.depthRenderMaterial, this.renderToScreen ? null : writeBuffer );
+					break;
+
+				case SSAOPass.OUTPUT.Normal:
+					this.copyMaterial.uniforms[ 'tDiffuse' ].value = this.normalRenderTarget.texture;
+					this.copyMaterial.blending = THREE.NoBlending;
+					this.renderPass( renderer, this.copyMaterial, this.renderToScreen ? null : writeBuffer );
+					break;
+
+				case SSAOPass.OUTPUT.Default:
+					this.copyMaterial.uniforms[ 'tDiffuse' ].value = this.beautyRenderTarget.texture;
+					this.copyMaterial.blending = THREE.NoBlending;
+					this.renderPass( renderer, this.copyMaterial, this.renderToScreen ? null : writeBuffer );
+					this.copyMaterial.uniforms[ 'tDiffuse' ].value = this.blurRenderTarget.texture;
+					this.copyMaterial.blending = THREE.CustomBlending;
+					this.renderPass( renderer, this.copyMaterial, this.renderToScreen ? null : writeBuffer );
+					break;
+
+				default:
+					console.warn( 'THREE.SSAOPass: Unknown output type.' );
+
+			}
+
+		}
+
+		renderPass( renderer, passMaterial, renderTarget, clearColor, clearAlpha ) {
+
+			// save original state
+			renderer.getClearColor( this.originalClearColor );
+			const originalClearAlpha = renderer.getClearAlpha();
+			const originalAutoClear = renderer.autoClear;
+			renderer.setRenderTarget( renderTarget ); // setup pass state
+
+			renderer.autoClear = false;
+
+			if ( clearColor !== undefined && clearColor !== null ) {
+
+				renderer.setClearColor( clearColor );
+				renderer.setClearAlpha( clearAlpha || 0.0 );
+				renderer.clear();
+
+			}
+
+			this.fsQuad.material = passMaterial;
+			this.fsQuad.render( renderer ); // restore original state
+
+			renderer.autoClear = originalAutoClear;
+			renderer.setClearColor( this.originalClearColor );
+			renderer.setClearAlpha( originalClearAlpha );
+
+		}
+
+		renderOverride( renderer, overrideMaterial, renderTarget, clearColor, clearAlpha ) {
+
+			renderer.getClearColor( this.originalClearColor );
+			const originalClearAlpha = renderer.getClearAlpha();
+			const originalAutoClear = renderer.autoClear;
+			renderer.setRenderTarget( renderTarget );
+			renderer.autoClear = false;
+			clearColor = overrideMaterial.clearColor || clearColor;
+			clearAlpha = overrideMaterial.clearAlpha || clearAlpha;
+
+			if ( clearColor !== undefined && clearColor !== null ) {
+
+				renderer.setClearColor( clearColor );
+				renderer.setClearAlpha( clearAlpha || 0.0 );
+				renderer.clear();
+
+			}
+
+			this.scene.overrideMaterial = overrideMaterial;
+			renderer.render( this.scene, this.camera );
+			this.scene.overrideMaterial = null; // restore original state
+
+			renderer.autoClear = originalAutoClear;
+			renderer.setClearColor( this.originalClearColor );
+			renderer.setClearAlpha( originalClearAlpha );
+
+		}
+
+		setSize( width, height ) {
+
+			this.width = width;
+			this.height = height;
+			this.beautyRenderTarget.setSize( width, height );
+			this.ssaoRenderTarget.setSize( width, height );
+			this.normalRenderTarget.setSize( width, height );
+			this.blurRenderTarget.setSize( width, height );
+			this.ssaoMaterial.uniforms[ 'resolution' ].value.set( width, height );
+			this.ssaoMaterial.uniforms[ 'cameraProjectionMatrix' ].value.copy( this.camera.projectionMatrix );
+			this.ssaoMaterial.uniforms[ 'cameraInverseProjectionMatrix' ].value.copy( this.camera.projectionMatrixInverse );
+			this.blurMaterial.uniforms[ 'resolution' ].value.set( width, height );
+
+		}
+
+		generateSampleKernel() {
+
+			const kernelSize = this.kernelSize;
+			const kernel = this.kernel;
+
+			for ( let i = 0; i < kernelSize; i ++ ) {
+
+				const sample = new THREE.Vector3();
+				sample.x = Math.random() * 2 - 1;
+				sample.y = Math.random() * 2 - 1;
+				sample.z = Math.random();
+				sample.normalize();
+				let scale = i / kernelSize;
+				scale = THREE.MathUtils.lerp( 0.1, 1, scale * scale );
+				sample.multiplyScalar( scale );
+				kernel.push( sample );
+
+			}
+
+		}
+
+		generateRandomKernelRotations() {
+
+			const width = 4,
+				height = 4;
+
+			if ( THREE.SimplexNoise === undefined ) {
+
+				console.error( 'THREE.SSAOPass: The pass relies on THREE.SimplexNoise.' );
+
+			}
+
+			const simplex = new THREE.SimplexNoise();
+			const size = width * height;
+			const data = new Float32Array( size );
+
+			for ( let i = 0; i < size; i ++ ) {
+
+				const x = Math.random() * 2 - 1;
+				const y = Math.random() * 2 - 1;
+				const z = 0;
+				data[ i ] = simplex.noise3d( x, y, z );
+
+			}
+
+			this.noiseTexture = new THREE.DataTexture( data, width, height, THREE.RedFormat, THREE.FloatType );
+			this.noiseTexture.wrapS = THREE.RepeatWrapping;
+			this.noiseTexture.wrapT = THREE.RepeatWrapping;
+			this.noiseTexture.needsUpdate = true;
+
+		}
+
+		overrideVisibility() {
+
+			const scene = this.scene;
+			const cache = this._visibilityCache;
+			scene.traverse( function ( object ) {
+
+				cache.set( object, object.visible );
+				if ( object.isPoints || object.isLine ) object.visible = false;
+
+			} );
+
+		}
+
+		restoreVisibility() {
+
+			const scene = this.scene;
+			const cache = this._visibilityCache;
+			scene.traverse( function ( object ) {
+
+				const visible = cache.get( object );
+				object.visible = visible;
+
+			} );
+			cache.clear();
+
+		}
+
+	}
+
+	SSAOPass.OUTPUT = {
+		'Default': 0,
+		'SSAO': 1,
+		'Blur': 2,
+		'Beauty': 3,
+		'Depth': 4,
+		'Normal': 5
+	};
+
+	THREE.SSAOPass = SSAOPass;
 
 } )();
 
@@ -3014,13 +4418,75 @@ $('btnOverMenu').onclick = () => { SFX.click(); refreshMenu(); setStateUI('menu'
 /* ====================================================================== */
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
+scene.add(sun.target);
+let sunFocus = new THREE.Vector3();
 
-const composer = new THREE.EffectComposer(renderer);
-composer.addPass(new THREE.RenderPass(scene, camera));
-const bloomPass = new THREE.UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), isTouch ? 0.32 : 0.46, 0.7, 0.9);
-composer.addPass(bloomPass);
-composer.addPass(new THREE.ShaderPass(THREE.GammaCorrectionShader));
-addEventListener('resize', () => { composer.setSize(innerWidth, innerHeight); });
+/* color grading cinematografico + vignettatura */
+const ColorGradeShader = {
+  uniforms: { tDiffuse: { value: null }, uSat: { value: 1.12 }, uContrast: { value: 1.07 }, uVig: { value: 0.5 }, uTint: { value: new THREE.Vector3(1.02, 1.0, 0.97) } },
+  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+  fragmentShader: [
+    'uniform sampler2D tDiffuse; uniform float uSat; uniform float uContrast; uniform float uVig; uniform vec3 uTint; varying vec2 vUv;',
+    'void main(){',
+    '  vec4 c = texture2D(tDiffuse, vUv); vec3 col = c.rgb;',
+    '  col = (col - 0.5) * uContrast + 0.5;',
+    '  float l = dot(col, vec3(0.299, 0.587, 0.114));',
+    '  col = mix(vec3(l), col, uSat);',
+    '  col *= uTint;',
+    '  vec2 q = vUv - 0.5; float v = smoothstep(0.9, 0.32, length(q));',
+    '  col *= mix(1.0, v, uVig);',
+    '  gl_FragColor = vec4(clamp(col, 0.0, 1.0), c.a);',
+    '}'].join('\n'),
+};
+
+const QORDER = ['lite', 'alto', 'ultra'];
+let quality = save.quality || (isTouch ? 'lite' : 'ultra');
+if (QORDER.indexOf(quality) < 0) quality = 'alto';
+let composer, bloomPass, ssaoPass, fxaaPass, gradePass;
+function buildComposer() {
+  composer = new THREE.EffectComposer(renderer);
+  ssaoPass = null; fxaaPass = null;
+  if (quality === 'ultra') {
+    try {
+      ssaoPass = new THREE.SSAOPass(scene, camera, innerWidth, innerHeight);
+      ssaoPass.kernelRadius = 12; ssaoPass.minDistance = 0.002; ssaoPass.maxDistance = 0.09;
+      composer.addPass(ssaoPass);
+    } catch (e) { ssaoPass = null; }
+  }
+  if (!ssaoPass) composer.addPass(new THREE.RenderPass(scene, camera));
+  bloomPass = new THREE.UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), isTouch ? 0.3 : (quality === 'ultra' ? 0.5 : 0.42), 0.7, 0.9);
+  composer.addPass(bloomPass);
+  gradePass = new THREE.ShaderPass(ColorGradeShader);
+  gradePass.material.uniforms.uVig.value = quality === 'lite' ? 0.35 : 0.55;
+  composer.addPass(gradePass);
+  if (quality !== 'lite') { fxaaPass = new THREE.ShaderPass(THREE.FXAAShader); composer.addPass(fxaaPass); }
+  composer.addPass(new THREE.ShaderPass(THREE.GammaCorrectionShader));
+  sizeComposer();
+}
+function sizeComposer() {
+  const pr = renderer.getPixelRatio();
+  composer.setSize(innerWidth, innerHeight);
+  if (ssaoPass) ssaoPass.setSize(innerWidth, innerHeight);
+  if (fxaaPass) fxaaPass.material.uniforms['resolution'].value.set(1 / (innerWidth * pr), 1 / (innerHeight * pr));
+}
+function applyQuality() {
+  const sz = quality === 'ultra' ? (isTouch ? 2048 : 4096) : (quality === 'alto' ? 2048 : 1024);
+  sun.shadow.mapSize.set(sz, sz);
+  if (sun.shadow.map) { sun.shadow.map.dispose(); sun.shadow.map = null; }
+  sun.shadow.radius = quality === 'lite' ? 2 : 4;
+  renderer.shadowMap.enabled = true;
+  buildComposer();
+  const qb = $('qualBtn'); if (qb) qb.textContent = quality === 'ultra' ? '◆ Ultra' : (quality === 'alto' ? '◈ Alto' : '◇ Lite');
+}
+function cycleQuality() {
+  quality = QORDER[(QORDER.indexOf(quality) + 1) % QORDER.length];
+  save.quality = quality; persist();
+  applyQuality();
+  SFX.click();
+}
+applyQuality();
+addEventListener('resize', () => sizeComposer());
+const _qb = $('qualBtn'); if (_qb) _qb.onclick = cycleQuality;
 
 scene.fog.near = 95; scene.fog.far = 520;
 
@@ -3048,11 +4514,13 @@ const _sd = new THREE.Vector3();
 const _nightSky = new THREE.Color(0x0a1430), _nightHor = new THREE.Color(0x16213d);
 function updateSky(dt) {
   if (G.mode === 'adventure' && G.state === 'play') dayClock += dt * DAY_SPEED;
+  if (G.mode === 'adventure' && ADV.active) sunFocus.copy(ADV.sailing && ADV.ship ? ADV.ship.position : (ADV.fig ? ADV.fig.g.position : sunFocus.set(0,0,0))); else sunFocus.set(0, 0, 0);
   const ang = (dayClock % 1) * TAU;
   const elev = Math.sin(ang), cosA = Math.cos(ang);
   _sd.set(cosA * 0.55, Math.max(-0.25, elev), 0.32).normalize();
   skyUni.uSunDir.value.copy(_sd);
-  sun.position.copy(_sd).multiplyScalar(60);
+  sun.position.copy(_sd).multiplyScalar(60).add(sunFocus);
+  sun.target.position.copy(sunFocus); sun.target.updateMatrixWorld();
   sunSprite.position.copy(_sd).multiplyScalar(430);
   const up = clamp((elev + 0.12) / 0.55, 0, 1), night = 1 - up;
   sun.intensity = (0.1 + up * 1.95) * LIGHT_SCALE;
