@@ -218,14 +218,12 @@
     <div class="subtitle">⚓ avventura nel mondo dei pirati ⚓</div>
     <div class="best" id="bestText"></div>
     <div style="margin-top:24px">
-      <button class="btn" id="btnAdv">🗺️ Avventura</button>
-      <button class="btn sec" id="btnSurv">⚔️ Sopravvivenza</button>
+      <button class="btn" id="btnAdv">⛵ Salpa all'Avventura</button>
     </div>
     <div style="margin-top:6px">
       <button class="btn ghost" id="btnShop">🏪 Mercato Nero &nbsp;<span class="berry" id="shopBerries"></span></button>
     </div>
-    <div class="hint"><b style="color:#ffe9a8">🗺️ Avventura</b> — salpa per la Rotta Maggiore, esplora le 6 isole, apri i forzieri e libera ogni isola dalla Marina sconfiggendone il Boss.<br>
-    <b style="color:#9fd4ff">⚔️ Sopravvivenza</b> — resisti a ondate infinite di nemici sempre più forti.<br>
+    <div class="hint">Salpa per la <b style="color:#ffe9a8">Rotta Maggiore</b>: naviga col tuo vascello, esplora le 6 isole, apri i forzieri e libera ogni isola dalla Marina sconfiggendone il Boss.<br>
     Raccogli <b class="berry">Ƀ berry</b> per potenziare la ciurma al Mercato Nero.</div>
   </div>
 </div>
@@ -5123,7 +5121,7 @@ function updateAdvHud() {
 }
 
 /* ---- pulsanti: scelta modalità + azione touch ---- */
-let pendingMode = 'survivors';
+let pendingMode = 'adventure';
 function renderModeSelect(mode) { pendingMode = mode; renderSelect(); setStateUI('select'); }
 const _btnAdv = $('btnAdv'), _btnSurv = $('btnSurv');
 if (_btnAdv) _btnAdv.onclick = () => { SFX.click(); renderModeSelect('adventure'); };
